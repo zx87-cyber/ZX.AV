@@ -8,6 +8,7 @@ on:
 jobs:
   build-windows-exe:
     runs-on: windows-latest
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -26,9 +27,9 @@ jobs:
         run: |
           pyinstaller --noconfirm --onefile --windowed `
             --name ZXAV `
-            --add-data "license_keys.json;." `
-            --add-data "CHANGELOG.md;." `
-            app.py
+            --add-data "zxav-antivirus/license_keys.json;." `
+            --add-data "zxav-antivirus/CHANGELOG.md;." `
+            zxav-antivirus/app.py
 
       - name: Upload exe as build artifact
         uses: actions/upload-artifact@v4
