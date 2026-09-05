@@ -3,14 +3,11 @@ name: Build ZX.AV
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch: {}
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-
-  # =========================
-  # Windows EXE
-  # =========================
   build-windows-exe:
     runs-on: windows-latest
 
@@ -29,12 +26,7 @@ jobs:
           pip install pyinstaller
 
       - name: Build Windows executable
-        run: |
-          pyinstaller --noconfirm --onefile --windowed `
-            --name ZXAV `
-            --add-data "zxav-antivirus/license_keys.json;." `
-            --add-data "zxav-antivirus/CHANGELOG.md;." `
-            zxav-antivirus/app.py
+        run: pyinstaller --noconfirm --onefile --windowed --name ZXAV --add-data "zxav-antivirus/license_keys.json;." --add-data "zxav-antivirus/CHANGELOG.md;." zxav-antivirus/app.py
 
       - name: Upload Windows executable
         uses: actions/upload-artifact@v4
@@ -42,10 +34,6 @@ jobs:
           name: ZXAV-windows-exe
           path: dist/ZXAV.exe
 
-
-  # =========================
-  # Linux AppImage
-  # =========================
   build-linux-appimage:
     runs-on: ubuntu-latest
 
@@ -64,18 +52,12 @@ jobs:
           pip install pyinstaller
 
       - name: Build Linux executable
-        run: |
-          pyinstaller --noconfirm --onefile --windowed \
-            --name ZXAV \
-            --add-data "zxav-antivirus/license_keys.json:." \
-            --add-data "zxav-antivirus/CHANGELOG.md:." \
-            zxav-antivirus/app.py
+        run: pyinstaller --noconfirm --onefile --windowed --name ZXAV --add-data "zxav-antivirus/license_keys.json:." --add-data "zxav-antivirus/CHANGELOG.md:." zxav-antivirus/app.py
 
       - name: Prepare AppImage
         run: |
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/applications
-
           cp dist/ZXAV AppDir/usr/bin/ZXAV
 
           cat > AppDir/usr/share/applications/ZXAV.desktop << 'EOF'
@@ -97,14 +79,13 @@ jobs:
           chmod +x AppDir/AppRun
 
       - name: Download appimagetool
-        run: |
-          wget -O appimagetool \
-            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool
+        run: wget -O appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+
+      - name: Make appimagetool executable
+        run: chmod +x appimagetool
 
       - name: Build AppImage
-        run: |
-          ./appimagetool AppDir ZXAV-x86_64.AppImage
+        run: ./appimagetool AppDir ZXAV-x86_64.AppImage
 
       - name: Upload Linux AppImage
         uses: actions/upload-artifact@v4
