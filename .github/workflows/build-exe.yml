@@ -71,4 +71,3 @@ jobs:
         with:
           name: ZXAV-linux-appimage
           path: ZXAV-x86_64.AppImage
-```
