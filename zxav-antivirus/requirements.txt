@@ -1,0 +1,3 @@
+# app.py only uses the Python standard library (tkinter, urllib, hashlib, json)
+# pyinstaller is only needed for building the .exe, handled by the GitHub Actions workflow
+pyinstaller>=6.0
