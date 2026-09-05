@@ -1,19 +1,4 @@
-"""
-ZX.AV — Secured by ZX.AI
-A lightweight file/URL scanner powered by the VirusTotal public API.
-
-This tool does NOT contain its own malware-detection engine. It works by
-submitting file hashes / URLs to VirusTotal, which aggregates results from
-70+ real antivirus engines, and displays those real results back to you.
-You need your own free VirusTotal API key: https://www.virustotal.com/gui/join-us
-
-License keys are validated locally against license_keys.json (bundled
-alongside this app) to unlock the app and to show which tier is active.
-This is a local license check for your own product — it does not phone
-home or validate against a remote server.
-"""
-
-import base64
+```python
 import hashlib
 import json
 import os
@@ -25,23 +10,35 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from urllib import request as urlrequest
 from urllib import error as urlerror
 
+
+# ============================================================
+# ZX.AV
+# Professional grey security utility
+# ============================================================
+
 APP_NAME = "ZX.AV"
 APP_TAGLINE = "SECURED BY ZX.AI"
-APP_VERSION = "1.3.0"
+APP_VERSION = "2.0.0"
 
-# ---- Tier durations (seconds) — None means never expires ----
+
+# ============================================================
+# License
+# ============================================================
+
 TIER_DURATIONS = {
     "TRIAL": 10 * 60,
     "MONTHLY": 30 * 24 * 3600,
     "PRO": 365 * 24 * 3600,
     "LIFETIME": None,
 }
+
 TIER_LABELS = {
     "TRIAL": "Trial",
     "MONTHLY": "Member",
     "PRO": "Member Plus",
     "LIFETIME": "Lifetime",
 }
+
 TIER_DESCRIPTIONS = {
     "TRIAL": "10 minutes, single use",
     "MONTHLY": "1 month",
@@ -49,149 +46,258 @@ TIER_DESCRIPTIONS = {
     "LIFETIME": "Never expires",
 }
 
-# ---- Theme (matches the ZX.AV logo) ----
-BG = "#0B0B0C"
-PANEL = "#151517"
-FG = "#F2F2F2"
-MUTED = "#8A8A8E"
-LINE = "#5C5C60"
-ACCENT = "#4FD1C5"
-DANGER = "#E5484D"
-OK = "#3DD68C"
 
-CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".zxav")
-CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
+# ============================================================
+# Grey theme
+# ============================================================
+
+BG = "#101112"
+SIDEBAR = "#151617"
+PANEL = "#191B1D"
+PANEL_LIGHT = "#202224"
+PANEL_HOVER = "#282A2D"
+
+WHITE = "#F1F1F1"
+TEXT = "#D7D7D7"
+MUTED = "#8C8F93"
+MUTED_DARK = "#65686C"
+
+BORDER = "#2B2D30"
+BORDER_LIGHT = "#36383B"
+
+# Status colours only.
+# These are deliberately NOT part of the main theme.
+GREEN = "#55B982"
+RED = "#D96565"
+YELLOW = "#C7A65B"
+
+CONFIG_DIR = os.path.join(
+    os.path.expanduser("~"),
+    ".zxav"
+)
+
+CONFIG_PATH = os.path.join(
+    CONFIG_DIR,
+    "config.json"
+)
 
 VT_BASE = "https://www.virustotal.com/api/v3"
 
 
+# ============================================================
+# Configuration / licensing
+# ============================================================
+
 def resource_path(relative_path):
-    """Resolve a bundled resource path, working both from source and from
-    a PyInstaller-frozen exe."""
-    base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    base_path = getattr(
+        sys,
+        "_MEIPASS",
+        os.path.dirname(os.path.abspath(__file__))
+    )
     return os.path.join(base_path, relative_path)
 
 
 def load_config():
     if os.path.exists(CONFIG_PATH):
         try:
-            with open(CONFIG_PATH, "r") as f:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             return {}
+
     return {}
 
 
 def save_config(cfg):
     os.makedirs(CONFIG_DIR, exist_ok=True)
-    with open(CONFIG_PATH, "w") as f:
+
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2)
 
 
 def load_license_keys():
-    path = resource_path("license_keys.json")
     try:
-        with open(path, "r") as f:
+        with open(
+            resource_path("license_keys.json"),
+            "r",
+            encoding="utf-8"
+        ) as f:
             return json.load(f)
     except Exception:
         return {}
 
 
 def load_changelog():
-    path = resource_path("CHANGELOG.md")
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(
+            resource_path("CHANGELOG.md"),
+            "r",
+            encoding="utf-8"
+        ) as f:
             return f.read()
     except Exception:
         return "Changelog not available."
 
 
 def validate_license(key):
-    """Check a key against the bundled license_keys.json. Returns the
-    tier name (str) if valid, else None."""
     key = key.strip().upper()
+
     keys = load_license_keys()
+
     for tier, key_list in keys.items():
         if key in key_list:
             return tier
+
     return None
 
 
 def compute_expiry(tier, activated_at):
-    """Returns the epoch expiry time for a tier/activation, or None if
-    the tier never expires."""
     duration = TIER_DURATIONS.get(tier)
+
     if duration is None:
         return None
+
     return activated_at + duration
 
 
 def license_is_expired(cfg):
     tier = cfg.get("license_tier")
     activated_at = cfg.get("activated_at")
+
     if not tier or not activated_at:
         return True
-    expiry = compute_expiry(tier, activated_at)
+
+    expiry = compute_expiry(
+        tier,
+        activated_at
+    )
+
     if expiry is None:
         return False
+
     return time.time() >= expiry
 
 
 def format_expiry(tier, activated_at):
-    expiry = compute_expiry(tier, activated_at)
+    expiry = compute_expiry(
+        tier,
+        activated_at
+    )
+
     if expiry is None:
         return "No expiry"
+
     remaining = expiry - time.time()
+
     if remaining <= 0:
         return "Expired"
-    if tier == "TRIAL":
-        mins, secs = divmod(int(remaining), 60)
-        return f"Expires in {mins:02d}:{secs:02d}"
-    return f"Expires {time.strftime('%Y-%m-%d', time.localtime(expiry))}"
 
+    if tier == "TRIAL":
+        mins, secs = divmod(
+            int(remaining),
+            60
+        )
+        return f"Expires in {mins:02d}:{secs:02d}"
+
+    return time.strftime(
+        "Expires %d %b %Y",
+        time.localtime(expiry)
+    )
+
+
+# ============================================================
+# VirusTotal
+# ============================================================
 
 def vt_headers(api_key):
-    return {"x-apikey": api_key}
+    return {
+        "x-apikey": api_key,
+        "Accept": "application/json",
+    }
 
 
-def vt_request(url, api_key, method="GET", data=None):
-    req = urlrequest.Request(url, method=method, headers=vt_headers(api_key), data=data)
-    with urlrequest.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+def vt_request(
+    url,
+    api_key,
+    method="GET",
+    data=None
+):
+    req = urlrequest.Request(
+        url,
+        method=method,
+        headers=vt_headers(api_key),
+        data=data
+    )
+
+    with urlrequest.urlopen(
+        req,
+        timeout=30
+    ) as resp:
+        return json.loads(
+            resp.read().decode("utf-8")
+        )
 
 
-def sha256_of_file(path, chunk_size=1 << 20):
+def sha256_of_file(
+    path,
+    chunk_size=1 << 20
+):
     h = hashlib.sha256()
+
     with open(path, "rb") as f:
         while True:
             chunk = f.read(chunk_size)
+
             if not chunk:
                 break
+
             h.update(chunk)
+
     return h.hexdigest()
 
 
-def vt_lookup_file_hash(file_hash, api_key):
-    """Look up an existing report for a file hash. Raises urlerror.HTTPError
-    with code 404 if VT has never seen this file."""
-    url = f"{VT_BASE}/files/{file_hash}"
-    return vt_request(url, api_key)
+def vt_lookup_file_hash(
+    file_hash,
+    api_key
+):
+    return vt_request(
+        f"{VT_BASE}/files/{file_hash}",
+        api_key
+    )
 
 
-def vt_upload_file(path, api_key):
-    """Upload a file to VirusTotal for scanning (used when VT has no
-    existing report for the hash). Returns an analysis id."""
+def vt_upload_file(
+    path,
+    api_key
+):
     boundary = "----ZXAVBoundary"
+
     filename = os.path.basename(path)
+
     with open(path, "rb") as f:
         file_bytes = f.read()
 
     body = bytearray()
-    body += f"--{boundary}\r\n".encode()
-    body += f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'.encode()
-    body += b"Content-Type: application/octet-stream\r\n\r\n"
+
+    body += (
+        f"--{boundary}\r\n"
+    ).encode()
+
+    body += (
+        f'Content-Disposition: form-data; '
+        f'name="file"; filename="{filename}"\r\n'
+    ).encode()
+
+    body += (
+        b"Content-Type: "
+        b"application/octet-stream\r\n\r\n"
+    )
+
     body += file_bytes
-    body += f"\r\n--{boundary}--\r\n".encode()
+
+    body += (
+        f"\r\n--{boundary}--\r\n"
+    ).encode()
 
     req = urlrequest.Request(
         f"{VT_BASE}/files",
@@ -199,644 +305,2361 @@ def vt_upload_file(path, api_key):
         data=bytes(body),
         headers={
             "x-apikey": api_key,
-            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "Content-Type":
+                f"multipart/form-data; boundary={boundary}",
         },
     )
-    with urlrequest.urlopen(req, timeout=120) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
+
+    with urlrequest.urlopen(
+        req,
+        timeout=120
+    ) as resp:
+        data = json.loads(
+            resp.read().decode("utf-8")
+        )
+
     return data["data"]["id"]
 
 
-def vt_get_analysis(analysis_id, api_key):
-    url = f"{VT_BASE}/analyses/{analysis_id}"
-    return vt_request(url, api_key)
+def vt_get_analysis(
+    analysis_id,
+    api_key
+):
+    return vt_request(
+        f"{VT_BASE}/analyses/{analysis_id}",
+        api_key
+    )
 
 
-def vt_submit_url(target_url, api_key):
+def vt_submit_url(
+    target_url,
+    api_key
+):
     body = f"url={target_url}".encode()
+
     req = urlrequest.Request(
         f"{VT_BASE}/urls",
         method="POST",
         data=body,
         headers={
             "x-apikey": api_key,
-            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Type":
+                "application/x-www-form-urlencoded",
         },
     )
-    with urlrequest.urlopen(req, timeout=30) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
+
+    with urlrequest.urlopen(
+        req,
+        timeout=30
+    ) as resp:
+        data = json.loads(
+            resp.read().decode("utf-8")
+        )
+
     return data["data"]["id"]
 
 
+# ============================================================
+# Application
+# ============================================================
+
 class ZXAVApp(tk.Tk):
+
     def __init__(self):
         super().__init__()
-        self.title(f"{APP_NAME} — {APP_TAGLINE}")
-        self.geometry("760x560")
-        self.minsize(680, 480)
-        self.configure(bg=BG)
+
+        self.title(
+            f"{APP_NAME} — {APP_TAGLINE}"
+        )
+
+        self.geometry("1120x720")
+        self.minsize(900, 600)
+
+        self.configure(
+            bg=BG
+        )
 
         self.cfg = load_config()
+
         self.scan_history = []
 
-        self._build_style()
+        self.progress_animation = None
+
+        self._configure_ttk()
 
         self._route_startup()
 
-    def _route_startup(self):
-        if license_is_expired(self.cfg):
-            expired_before = bool(self.cfg.get("license_tier"))
-            # Clear the expired license but keep used_keys so a burned
-            # TRIAL key can't be reactivated on this install.
-            self.cfg.pop("license_tier", None)
-            self.cfg.pop("license_key", None)
-            self.cfg.pop("activated_at", None)
-            save_config(self.cfg)
-            self._show_license_gate(
-                expired_message="Your previous license expired. Enter a new key to continue."
-                if expired_before else None
-            )
-        elif not self.cfg.get("vt_api_key"):
-            self._show_api_key_gate()
-        else:
-            self._build_main_ui()
+    # ========================================================
+    # ttk styling
+    # ========================================================
 
-    # ---------------- Styling ----------------
-    def _build_style(self):
+    def _configure_ttk(self):
+
         style = ttk.Style(self)
+
         try:
             style.theme_use("clam")
         except Exception:
             pass
-        style.configure("TFrame", background=BG)
-        style.configure("Panel.TFrame", background=PANEL)
-        style.configure("TLabel", background=BG, foreground=FG, font=("Segoe UI", 10))
-        style.configure("Muted.TLabel", background=BG, foreground=MUTED, font=("Segoe UI", 9))
-        style.configure("PanelLabel.TLabel", background=PANEL, foreground=FG, font=("Segoe UI", 10))
-        style.configure("Title.TLabel", background=BG, foreground=FG, font=("Segoe UI", 20, "bold"))
+
         style.configure(
-            "Accent.TButton",
-            background=ACCENT,
-            foreground="#0B0B0C",
-            font=("Segoe UI", 10, "bold"),
-            padding=8,
+            "ZX.TEntry",
+            fieldbackground=PANEL_LIGHT,
+            foreground=WHITE,
+            insertcolor=WHITE,
+            borderwidth=0,
+            padding=9,
         )
-        style.map("Accent.TButton", background=[("active", "#3fb9ae")])
+
         style.configure(
-            "Secondary.TButton",
-            background=PANEL,
-            foreground=FG,
-            font=("Segoe UI", 10),
-            padding=8,
+            "ZX.Horizontal.TProgressbar",
+            troughcolor=PANEL_LIGHT,
+            background="#9A9DA1",
+            bordercolor=PANEL_LIGHT,
+            lightcolor="#9A9DA1",
+            darkcolor="#9A9DA1",
         )
-        style.map("Secondary.TButton", background=[("active", "#1f1f22")])
-        style.configure("TEntry", fieldbackground=PANEL, foreground=FG, insertcolor=FG)
+
         style.configure(
-            "Treeview",
+            "ZX.Treeview",
             background=PANEL,
             fieldbackground=PANEL,
-            foreground=FG,
-            rowheight=26,
+            foreground=TEXT,
+            borderwidth=0,
+            rowheight=34,
             font=("Segoe UI", 9),
         )
+
         style.configure(
-            "Treeview.Heading",
-            background="#1c1c1f",
+            "ZX.Treeview.Heading",
+            background=PANEL_LIGHT,
             foreground=MUTED,
-            font=("Segoe UI", 9, "bold"),
+            relief="flat",
+            font=("Segoe UI", 8, "bold"),
         )
 
-    def _logo_header(self, parent):
-        header = ttk.Frame(parent, style="TFrame")
-        header.pack(fill="x", pady=(24, 10))
-        ttk.Label(header, text="ZX.AV", style="Title.TLabel").pack()
-        ttk.Label(header, text=APP_TAGLINE, style="Muted.TLabel").pack()
-        return header
+        style.map(
+            "ZX.Treeview",
+            background=[
+                ("selected", PANEL_HOVER)
+            ],
+            foreground=[
+                ("selected", WHITE)
+            ]
+        )
 
-    # ---------------- License gate ----------------
-    def _show_license_gate(self, expired_message=None):
-        for w in self.winfo_children():
-            w.destroy()
+    # ========================================================
+    # Generic helpers
+    # ========================================================
 
-        wrap = ttk.Frame(self, style="TFrame")
-        wrap.pack(expand=True, fill="both")
-        self._logo_header(wrap)
+    def clear_window(self):
+        for widget in self.winfo_children():
+            widget.destroy()
 
-        card = ttk.Frame(wrap, style="Panel.TFrame", padding=24)
-        card.pack(pady=20, padx=60, fill="x")
+    def make_button(
+        self,
+        parent,
+        text,
+        command,
+        primary=False,
+        small=False
+    ):
+        if primary:
+            bg = WHITE
+            fg = BG
+            active_bg = "#D0D0D0"
+            active_fg = BG
+        else:
+            bg = PANEL_LIGHT
+            fg = TEXT
+            active_bg = PANEL_HOVER
+            active_fg = WHITE
 
-        if expired_message:
-            ttk.Label(card, text=expired_message, style="PanelLabel.TLabel",
-                      foreground=DANGER, wraplength=420, justify="left").pack(
-                anchor="w", pady=(0, 12)
+        btn = tk.Button(
+            parent,
+            text=text,
+            command=command,
+            bg=bg,
+            fg=fg,
+            activebackground=active_bg,
+            activeforeground=active_fg,
+            relief="flat",
+            bd=0,
+            highlightthickness=0,
+            cursor="hand2",
+            font=(
+                "Segoe UI",
+                9 if small else 10,
+                "bold" if primary else "normal"
+            ),
+            padx=(
+                12 if small else 18
+            ),
+            pady=(
+                7 if small else 10
+            ),
+        )
+
+        return btn
+
+    def make_panel(
+        self,
+        parent,
+        padx=18,
+        pady=18
+    ):
+        frame = tk.Frame(
+            parent,
+            bg=PANEL,
+            highlightbackground=BORDER,
+            highlightthickness=1,
+            bd=0
+        )
+
+        inner = tk.Frame(
+            frame,
+            bg=PANEL
+        )
+
+        inner.pack(
+            fill="both",
+            expand=True,
+            padx=padx,
+            pady=pady
+        )
+
+        return frame, inner
+
+    def make_title(
+        self,
+        parent,
+        text,
+        size=20
+    ):
+        return tk.Label(
+            parent,
+            text=text,
+            bg=parent.cget("bg"),
+            fg=WHITE,
+            font=(
+                "Segoe UI",
+                size,
+                "bold"
+            )
+        )
+
+    def make_muted(
+        self,
+        parent,
+        text,
+        size=9
+    ):
+        return tk.Label(
+            parent,
+            text=text,
+            bg=parent.cget("bg"),
+            fg=MUTED,
+            font=(
+                "Segoe UI",
+                size
+            )
+        )
+
+    # ========================================================
+    # Startup routing
+    # ========================================================
+
+    def _route_startup(self):
+
+        if license_is_expired(
+            self.cfg
+        ):
+
+            had_license = bool(
+                self.cfg.get(
+                    "license_tier"
+                )
             )
 
-        ttk.Label(card, text="Enter your license key", style="PanelLabel.TLabel",
-                  font=("Segoe UI", 12, "bold")).pack(anchor="w")
-        ttk.Label(card, text="Format: ZXAV-XXXXX-XXXXX-XXXXX-XXXXX", style="Muted.TLabel").pack(
-            anchor="w", pady=(2, 12)
+            self.cfg.pop(
+                "license_tier",
+                None
+            )
+
+            self.cfg.pop(
+                "license_key",
+                None
+            )
+
+            self.cfg.pop(
+                "activated_at",
+                None
+            )
+
+            save_config(
+                self.cfg
+            )
+
+            self._show_license_gate(
+                expired_message=(
+                    "Your previous license expired. "
+                    "Enter a new key to continue."
+                    if had_license
+                    else None
+                )
+            )
+
+        elif not self.cfg.get(
+            "vt_api_key"
+        ):
+
+            self._show_api_key_gate()
+
+        else:
+
+            self._build_main_ui()
+
+    # ========================================================
+    # License gate
+    # ========================================================
+
+    def _show_license_gate(
+        self,
+        expired_message=None
+    ):
+
+        self.clear_window()
+
+        outer = tk.Frame(
+            self,
+            bg=BG
+        )
+
+        outer.pack(
+            fill="both",
+            expand=True
+        )
+
+        header = tk.Frame(
+            outer,
+            bg=BG
+        )
+
+        header.pack(
+            fill="x",
+            padx=45,
+            pady=35
+        )
+
+        tk.Label(
+            header,
+            text="ZX.AV",
+            bg=BG,
+            fg=WHITE,
+            font=("Segoe UI", 25, "bold")
+        ).pack(
+            anchor="w"
+        )
+
+        tk.Label(
+            header,
+            text=APP_TAGLINE,
+            bg=BG,
+            fg=MUTED,
+            font=("Segoe UI", 8, "bold")
+        ).pack(
+            anchor="w",
+            pady=(1, 0)
+        )
+
+        card = tk.Frame(
+            outer,
+            bg=PANEL,
+            highlightbackground=BORDER,
+            highlightthickness=1
+        )
+
+        card.pack(
+            padx=45,
+            pady=15,
+            ipadx=35,
+            ipady=30
+        )
+
+        tk.Label(
+            card,
+            text="License activation",
+            bg=PANEL,
+            fg=WHITE,
+            font=("Segoe UI", 19, "bold")
+        ).pack(
+            anchor="w",
+            padx=35
+        )
+
+        tk.Label(
+            card,
+            text=(
+                "Enter your ZX.AV license key to unlock the application."
+            ),
+            bg=PANEL,
+            fg=MUTED,
+            font=("Segoe UI", 9)
+        ).pack(
+            anchor="w",
+            padx=35,
+            pady=(5, 22)
+        )
+
+        if expired_message:
+
+            tk.Label(
+                card,
+                text=expired_message,
+                bg=PANEL,
+                fg=RED,
+                font=("Segoe UI", 9)
+            ).pack(
+                anchor="w",
+                padx=35,
+                pady=(0, 15)
+            )
+
+        tk.Label(
+            card,
+            text="LICENSE KEY",
+            bg=PANEL,
+            fg=MUTED,
+            font=("Segoe UI", 8, "bold")
+        ).pack(
+            anchor="w",
+            padx=35,
+            pady=(0, 5)
         )
 
         key_var = tk.StringVar()
-        entry = ttk.Entry(card, textvariable=key_var, font=("Consolas", 11), width=40)
-        entry.pack(fill="x", pady=(0, 12))
-        entry.focus()
 
-        status_lbl = ttk.Label(card, text="", style="Muted.TLabel", wraplength=420, justify="left")
-        status_lbl.pack(anchor="w", pady=(0, 8))
+        entry = tk.Entry(
+            card,
+            textvariable=key_var,
+            bg=PANEL_LIGHT,
+            fg=WHITE,
+            insertbackground=WHITE,
+            relief="flat",
+            bd=0,
+            font=("Consolas", 11)
+        )
 
-        def do_activate():
-            key_norm = key_var.get().strip().upper()
-            tier = validate_license(key_norm)
-            used_keys = self.cfg.get("used_keys", [])
+        entry.pack(
+            fill="x",
+            padx=35,
+            ipady=11
+        )
+
+        status = tk.Label(
+            card,
+            text="",
+            bg=PANEL,
+            fg=MUTED,
+            font=("Segoe UI", 9)
+        )
+
+        status.pack(
+            anchor="w",
+            padx=35,
+            pady=(10, 0)
+        )
+
+        def activate():
+
+            key = (
+                key_var
+                .get()
+                .strip()
+                .upper()
+            )
+
+            tier = validate_license(
+                key
+            )
+
+            used_keys = self.cfg.get(
+                "used_keys",
+                []
+            )
+
             if not tier:
-                status_lbl.configure(text="✗ Key not recognized. Check and try again.", foreground=DANGER)
-                return
-            if key_norm in used_keys:
-                status_lbl.configure(
-                    text="✗ This key has already been activated on this device.",
-                    foreground=DANGER,
+
+                status.configure(
+                    text="Key not recognized.",
+                    fg=RED
                 )
+
                 return
-            self.cfg["license_tier"] = tier
-            self.cfg["license_key"] = key_norm
-            self.cfg["activated_at"] = time.time()
-            used_keys.append(key_norm)
-            self.cfg["used_keys"] = used_keys
-            save_config(self.cfg)
+
+            if key in used_keys:
+
+                status.configure(
+                    text="This key has already been activated on this device.",
+                    fg=RED
+                )
+
+                return
+
+            self.cfg[
+                "license_tier"
+            ] = tier
+
+            self.cfg[
+                "license_key"
+            ] = key
+
+            self.cfg[
+                "activated_at"
+            ] = time.time()
+
+            used_keys.append(key)
+
+            self.cfg[
+                "used_keys"
+            ] = used_keys
+
+            save_config(
+                self.cfg
+            )
+
             self._route_startup()
 
-        entry.bind("<Return>", lambda e: do_activate())
-        ttk.Button(card, text="Activate", style="Accent.TButton", command=do_activate).pack(
-            anchor="e"
+        self.make_button(
+            card,
+            "Activate",
+            activate,
+            primary=True
+        ).pack(
+            anchor="e",
+            padx=35,
+            pady=20
         )
 
-        tiers_card = ttk.Frame(wrap, style="Panel.TFrame", padding=(16, 12))
-        tiers_card.pack(pady=(0, 20), padx=60, fill="x")
-        ttk.Label(tiers_card, text="Plans", style="PanelLabel.TLabel",
-                  font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 6))
-        for tier_key in ("TRIAL", "MONTHLY", "PRO", "LIFETIME"):
-            row = ttk.Frame(tiers_card, style="Panel.TFrame")
-            row.pack(fill="x", pady=1)
-            ttk.Label(row, text=TIER_LABELS[tier_key], style="PanelLabel.TLabel",
-                      font=("Segoe UI", 9, "bold")).pack(side="left")
-            ttk.Label(row, text=TIER_DESCRIPTIONS[tier_key], style="Muted.TLabel").pack(side="right")
-
-    # ---------------- API key gate ----------------
-    def _show_api_key_gate(self):
-        for w in self.winfo_children():
-            w.destroy()
-
-        wrap = ttk.Frame(self, style="TFrame")
-        wrap.pack(expand=True, fill="both")
-        self._logo_header(wrap)
-
-        tier = self.cfg.get("license_tier", "")
-        if tier:
-            ttk.Label(wrap, text=f"Plan: {TIER_LABELS.get(tier, tier)}", style="Muted.TLabel").pack()
-
-        card = ttk.Frame(wrap, style="Panel.TFrame", padding=24)
-        card.pack(pady=24, padx=60, fill="x")
-
-        ttk.Label(card, text="Connect your VirusTotal API key", style="PanelLabel.TLabel",
-                  font=("Segoe UI", 12, "bold")).pack(anchor="w")
-        ttk.Label(
-            card,
-            text=(
-                "ZX.AV checks files and URLs against VirusTotal's 70+ real AV\n"
-                "engines. Get a free key at virustotal.com \u2192 Settings \u2192 API Key,\n"
-                "then paste it below. It's stored only on this machine."
-            ),
-            style="Muted.TLabel",
-            justify="left",
-        ).pack(anchor="w", pady=(2, 12))
-
-        key_var = tk.StringVar(value=self.cfg.get("vt_api_key", ""))
-        entry = ttk.Entry(card, textvariable=key_var, font=("Consolas", 10), width=48, show="*")
-        entry.pack(fill="x", pady=(0, 8))
         entry.focus()
 
-        show_var = tk.BooleanVar(value=False)
-
-        def toggle_show():
-            entry.configure(show="" if show_var.get() else "*")
-
-        ttk.Checkbutton(card, text="Show key", variable=show_var, command=toggle_show).pack(
-            anchor="w", pady=(0, 12)
+        entry.bind(
+            "<Return>",
+            lambda e: activate()
         )
 
-        status_lbl = ttk.Label(card, text="", style="Muted.TLabel")
-        status_lbl.pack(anchor="w", pady=(0, 8))
+    # ========================================================
+    # API key setup
+    # ========================================================
 
-        btn_row = ttk.Frame(card, style="Panel.TFrame")
-        btn_row.pack(fill="x")
+    def _show_api_key_gate(self):
 
-        verify_btn = ttk.Button(btn_row, text="Verify key", style="Secondary.TButton")
-        verify_btn.pack(side="left")
-        continue_btn = ttk.Button(btn_row, text="Save & continue", style="Accent.TButton")
-        continue_btn.pack(side="right")
-        skip_btn = ttk.Button(btn_row, text="Skip for now", style="Secondary.TButton")
-        skip_btn.pack(side="right", padx=(0, 10))
+        self.clear_window()
 
-        def set_status(text, ok=None):
-            color = OK if ok is True else DANGER if ok is False else MUTED
-            self.after(0, lambda: status_lbl.configure(text=text, foreground=color))
+        root = tk.Frame(
+            self,
+            bg=BG
+        )
 
-        def do_verify():
+        root.pack(
+            fill="both",
+            expand=True
+        )
+
+        header = tk.Frame(
+            root,
+            bg=BG
+        )
+
+        header.pack(
+            fill="x",
+            padx=45,
+            pady=35
+        )
+
+        tk.Label(
+            header,
+            text="ZX.AV",
+            bg=BG,
+            fg=WHITE,
+            font=("Segoe UI", 25, "bold")
+        ).pack(
+            anchor="w"
+        )
+
+        tk.Label(
+            header,
+            text=APP_TAGLINE,
+            bg=BG,
+            fg=MUTED,
+            font=("Segoe UI", 8, "bold")
+        ).pack(
+            anchor="w"
+        )
+
+        card = tk.Frame(
+            root,
+            bg=PANEL,
+            highlightbackground=BORDER,
+            highlightthickness=1
+        )
+
+        card.pack(
+            padx=45,
+            pady=15,
+            ipadx=35,
+            ipady=30
+        )
+
+        tk.Label(
+            card,
+            text="VirusTotal connection",
+            bg=PANEL,
+            fg=WHITE,
+            font=("Segoe UI", 19, "bold")
+        ).pack(
+            anchor="w",
+            padx=35
+        )
+
+        tk.Label(
+            card,
+            text=(
+                "ZX.AV uses your VirusTotal API key to perform "
+                "file and URL scans."
+            ),
+            bg=PANEL,
+            fg=MUTED,
+            font=("Segoe UI", 9),
+            wraplength=520,
+            justify="left"
+        ).pack(
+            anchor="w",
+            padx=35,
+            pady=(5, 25)
+        )
+
+        tk.Label(
+            card,
+            text="API KEY",
+            bg=PANEL,
+            fg=MUTED,
+            font=("Segoe UI", 8, "bold")
+        ).pack(
+            anchor="w",
+            padx=35,
+            pady=(0, 5)
+        )
+
+        key_var = tk.StringVar(
+            value=self.cfg.get(
+                "vt_api_key",
+                ""
+            )
+        )
+
+        entry = tk.Entry(
+            card,
+            textvariable=key_var,
+            show="•",
+            bg=PANEL_LIGHT,
+            fg=WHITE,
+            insertbackground=WHITE,
+            relief="flat",
+            bd=0,
+            font=("Consolas", 10)
+        )
+
+        entry.pack(
+            fill="x",
+            padx=35,
+            ipady=11
+        )
+
+        status = tk.Label(
+            card,
+            text="",
+            bg=PANEL,
+            fg=MUTED,
+            font=("Segoe UI", 9)
+        )
+
+        status.pack(
+            anchor="w",
+            padx=35,
+            pady=10
+        )
+
+        buttons = tk.Frame(
+            card,
+            bg=PANEL
+        )
+
+        buttons.pack(
+            fill="x",
+            padx=35,
+            pady=8
+        )
+
+        def verify():
+
             key = key_var.get().strip()
+
             if not key:
-                set_status("Enter a key first.", ok=False)
+
+                status.configure(
+                    text="Enter an API key first.",
+                    fg=RED
+                )
+
                 return
-            verify_btn.configure(state="disabled")
-            set_status("Checking with VirusTotal...")
+
+            status.configure(
+                text="Checking connection...",
+                fg=MUTED
+            )
 
             def worker():
+
                 try:
-                    vt_request(f"{VT_BASE}/users/{key}", key)
-                    set_status("✓ Key verified — connected to VirusTotal.", ok=True)
+
+                    vt_request(
+                        f"{VT_BASE}/users/{key}",
+                        key
+                    )
+
+                    self.after(
+                        0,
+                        lambda: status.configure(
+                            text="Connection verified.",
+                            fg=GREEN
+                        )
+                    )
+
                 except urlerror.HTTPError as e:
-                    if e.code in (401, 403):
-                        set_status("✗ Invalid API key.", ok=False)
-                    else:
-                        set_status(f"✗ VirusTotal error ({e.code}).", ok=False)
+
+                    msg = (
+                        "Invalid API key."
+                        if e.code in (401, 403)
+                        else f"VirusTotal error ({e.code})."
+                    )
+
+                    self.after(
+                        0,
+                        lambda: status.configure(
+                            text=msg,
+                            fg=RED
+                        )
+                    )
+
                 except Exception as e:
-                    set_status(f"✗ Couldn't reach VirusTotal: {e}", ok=False)
-                finally:
-                    self.after(0, lambda: verify_btn.configure(state="normal"))
 
-            threading.Thread(target=worker, daemon=True).start()
+                    self.after(
+                        0,
+                        lambda: status.configure(
+                            text=f"Connection failed: {e}",
+                            fg=RED
+                        )
+                    )
 
-        def do_continue():
+            threading.Thread(
+                target=worker,
+                daemon=True
+            ).start()
+
+        def continue_setup():
+
             key = key_var.get().strip()
+
             if not key:
-                set_status("Enter a key, or choose Skip for now.", ok=False)
+
+                status.configure(
+                    text="Enter an API key first.",
+                    fg=RED
+                )
+
                 return
-            self.cfg["vt_api_key"] = key
-            save_config(self.cfg)
+
+            self.cfg[
+                "vt_api_key"
+            ] = key
+
+            save_config(
+                self.cfg
+            )
+
             self._build_main_ui()
 
-        def do_skip():
-            self._build_main_ui()
-
-        verify_btn.configure(command=do_verify)
-        continue_btn.configure(command=do_continue)
-        skip_btn.configure(command=do_skip)
-        entry.bind("<Return>", lambda e: do_continue())
-
-    # ---------------- Menu bar ----------------
-    def _build_menu_bar(self):
-        menubar = tk.Menu(self)
-
-        file_menu = tk.Menu(menubar, tearoff=0)
-        file_menu.add_command(label="Settings...", command=self._open_settings)
-        file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self.destroy)
-        menubar.add_cascade(label="File", menu=file_menu)
-
-        scan_menu = tk.Menu(menubar, tearoff=0)
-        scan_menu.add_command(label="Scan a file...", command=self._scan_file_dialog)
-        scan_menu.add_command(label="Scan a URL...", command=self._scan_url_dialog)
-        menubar.add_cascade(label="Scan", menu=scan_menu)
-
-        view_menu = tk.Menu(menubar, tearoff=0)
-        view_menu.add_command(label="Refresh dashboard", command=self._build_main_ui)
-        menubar.add_cascade(label="View", menu=view_menu)
-
-        help_menu = tk.Menu(menubar, tearoff=0)
-        help_menu.add_command(label="What's new (changelog)", command=self._show_changelog)
-        help_menu.add_command(label="About ZX.AV", command=self._show_about)
-        menubar.add_cascade(label="Help", menu=help_menu)
-
-        self.configure(menu=menubar)
-
-    def _show_changelog(self):
-        win = tk.Toplevel(self)
-        win.title("What's new — ZX.AV")
-        win.configure(bg=BG)
-        win.geometry("480x420")
-        text = tk.Text(win, bg=PANEL, fg=FG, font=("Consolas", 10), wrap="word",
-                        borderwidth=0, highlightthickness=0, padx=16, pady=16)
-        text.pack(fill="both", expand=True, padx=12, pady=12)
-        text.insert("1.0", load_changelog())
-        text.configure(state="disabled")
-
-    def _show_about(self):
-        tier = self.cfg.get("license_tier", "UNKNOWN")
-        messagebox.showinfo(
-            "About ZX.AV",
-            f"ZX.AV — {APP_TAGLINE}\nVersion {APP_VERSION}\n\n"
-            "Scans files and URLs using the VirusTotal API (70+ real AV engines).\n"
-            f"Plan: {TIER_LABELS.get(tier, tier)}",
+        self.make_button(
+            buttons,
+            "Verify",
+            verify,
+            small=True
+        ).pack(
+            side="left"
         )
 
-    # ---------------- Main dashboard ----------------
+        self.make_button(
+            buttons,
+            "Continue",
+            continue_setup,
+            primary=True
+        ).pack(
+            side="right"
+        )
+
+        entry.focus()
+
+    # ========================================================
+    # Main UI
+    # ========================================================
+
     def _build_main_ui(self):
-        for w in self.winfo_children():
-            w.destroy()
 
-        self._build_menu_bar()
+        self.clear_window()
 
-        top = ttk.Frame(self, style="TFrame", padding=(20, 16))
-        top.pack(fill="x")
-        left = ttk.Frame(top, style="TFrame")
-        left.pack(side="left")
-        ttk.Label(left, text="ZX.AV", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(left, text=f"{APP_TAGLINE}  ·  v{APP_VERSION}", style="Muted.TLabel").pack(anchor="w")
+        # ----------------------------------------------------
+        # Sidebar
+        # ----------------------------------------------------
 
-        right = ttk.Frame(top, style="TFrame")
-        right.pack(side="right")
-        tier = self.cfg.get("license_tier", "UNKNOWN")
-        tier_label = TIER_LABELS.get(tier, tier)
-        self.plan_var = tk.StringVar(value=f"Plan: {tier_label}")
-        self.expiry_var = tk.StringVar(value=format_expiry(tier, self.cfg.get("activated_at", 0)))
-        ttk.Label(right, textvariable=self.plan_var, style="Muted.TLabel").pack(anchor="e")
-        ttk.Label(right, textvariable=self.expiry_var, style="Muted.TLabel").pack(anchor="e")
-        api_status = "API key set" if self.cfg.get("vt_api_key") else "No API key set"
-        ttk.Label(right, text=api_status, style="Muted.TLabel").pack(anchor="e")
-        ttk.Button(right, text="Settings", style="Secondary.TButton",
-                   command=self._open_settings).pack(anchor="e", pady=(6, 0))
-
-        sep = tk.Frame(self, bg=LINE, height=1)
-        sep.pack(fill="x", padx=20)
-
-        body = ttk.Frame(self, style="TFrame", padding=20)
-        body.pack(fill="both", expand=True)
-
-        actions = ttk.Frame(body, style="Panel.TFrame", padding=16)
-        actions.pack(fill="x", pady=(0, 16))
-        ttk.Label(actions, text="Run a scan", style="PanelLabel.TLabel",
-                  font=("Segoe UI", 11, "bold")).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
-        ttk.Button(actions, text="Scan a file", style="Accent.TButton",
-                   command=self._scan_file_dialog).grid(row=1, column=0, padx=(0, 10))
-        ttk.Button(actions, text="Scan a URL", style="Secondary.TButton",
-                   command=self._scan_url_dialog).grid(row=1, column=1, padx=(0, 10))
-        self.progress = ttk.Progressbar(actions, mode="indeterminate", length=200)
-        self.progress.grid(row=1, column=2, padx=(10, 0))
-
-        stats_row = ttk.Frame(body, style="TFrame")
-        stats_row.pack(fill="x", pady=(0, 16))
-        self.stat_cards = {}
-        for i, (key, label) in enumerate([
-            ("total", "Total scans"),
-            ("clean", "Clean"),
-            ("flagged", "Flagged"),
-            ("last", "Last scan"),
-        ]):
-            card = ttk.Frame(stats_row, style="Panel.TFrame", padding=14)
-            card.grid(row=0, column=i, sticky="nsew", padx=(0, 10) if i < 3 else 0)
-            stats_row.columnconfigure(i, weight=1)
-            ttk.Label(card, text=label, style="Muted.TLabel").pack(anchor="w")
-            val_lbl = ttk.Label(card, text="0", style="PanelLabel.TLabel", font=("Segoe UI", 18, "bold"))
-            val_lbl.pack(anchor="w", pady=(4, 0))
-            self.stat_cards[key] = val_lbl
-
-        ttk.Label(body, text="Overview", style="TLabel", font=("Segoe UI", 11, "bold")).pack(
-            anchor="w", pady=(4, 6)
+        sidebar = tk.Frame(
+            self,
+            bg=SIDEBAR,
+            width=215
         )
 
-        diagrams_row = ttk.Frame(body, style="TFrame")
-        diagrams_row.pack(fill="x", pady=(0, 16))
-
-        ring_card = ttk.Frame(diagrams_row, style="Panel.TFrame", padding=14)
-        ring_card.pack(side="left", padx=(0, 10))
-        ttk.Label(ring_card, text="Protection", style="PanelLabel.TLabel",
-                  font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 8))
-        self.ring_canvas = tk.Canvas(ring_card, width=140, height=140, bg=PANEL,
-                                      highlightthickness=0)
-        self.ring_canvas.pack()
-
-        bars_card = ttk.Frame(diagrams_row, style="Panel.TFrame", padding=14)
-        bars_card.pack(side="left", fill="both", expand=True)
-        ttk.Label(bars_card, text="Detections (recent scans)", style="PanelLabel.TLabel",
-                  font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 8))
-        self.bars_canvas = tk.Canvas(bars_card, width=380, height=140, bg=PANEL,
-                                      highlightthickness=0)
-        self.bars_canvas.pack(fill="both", expand=True)
-
-        ttk.Label(body, text="Scan history", style="TLabel", font=("Segoe UI", 11, "bold")).pack(
-            anchor="w", pady=(4, 6)
+        sidebar.pack(
+            side="left",
+            fill="y"
         )
 
-        columns = ("target", "type", "result", "detections", "time")
-        self.tree = ttk.Treeview(body, columns=columns, show="headings", height=10)
-        for col, label, width in [
+        sidebar.pack_propagate(False)
+
+        logo = tk.Frame(
+            sidebar,
+            bg=SIDEBAR
+        )
+
+        logo.pack(
+            fill="x",
+            padx=22,
+            pady=(27, 30)
+        )
+
+        tk.Label(
+            logo,
+            text="ZX.AV",
+            bg=SIDEBAR,
+            fg=WHITE,
+            font=("Segoe UI", 22, "bold")
+        ).pack(
+            anchor="w"
+        )
+
+        tk.Label(
+            logo,
+            text=APP_TAGLINE,
+            bg=SIDEBAR,
+            fg=MUTED,
+            font=("Segoe UI", 7, "bold")
+        ).pack(
+            anchor="w"
+        )
+
+        # Navigation
+
+        tk.Label(
+            sidebar,
+            text="WORKSPACE",
+            bg=SIDEBAR,
+            fg=MUTED_DARK,
+            font=("Segoe UI", 7, "bold")
+        ).pack(
+            anchor="w",
+            padx=22,
+            pady=(0, 8)
+        )
+
+        self._sidebar_button(
+            sidebar,
+            "Overview",
+            self._build_main_ui,
+            active=True
+        )
+
+        self._sidebar_button(
+            sidebar,
+            "Scan file",
+            self._scan_file_dialog
+        )
+
+        self._sidebar_button(
+            sidebar,
+            "Scan URL",
+            self._scan_url_dialog
+        )
+
+        tk.Frame(
+            sidebar,
+            bg=BORDER,
+            height=1
+        ).pack(
+            fill="x",
+            padx=22,
+            pady=20
+        )
+
+        tk.Label(
+            sidebar,
+            text="APPLICATION",
+            bg=SIDEBAR,
+            fg=MUTED_DARK,
+            font=("Segoe UI", 7, "bold")
+        ).pack(
+            anchor="w",
+            padx=22,
+            pady=(0, 8)
+        )
+
+        self._sidebar_button(
+            sidebar,
+            "Settings",
+            self._open_settings
+        )
+
+        self._sidebar_button(
+            sidebar,
+            "What's new",
+            self._show_changelog
+        )
+
+        self._sidebar_button(
+            sidebar,
+            "About",
+            self._show_about
+        )
+
+        # Sidebar bottom
+
+        bottom = tk.Frame(
+            sidebar,
+            bg=SIDEBAR
+        )
+
+        bottom.pack(
+            side="bottom",
+            fill="x",
+            padx=22,
+            pady=22
+        )
+
+        tier = self.cfg.get(
+            "license_tier",
+            "UNKNOWN"
+        )
+
+        tk.Label(
+            bottom,
+            text="LICENSE",
+            bg=SIDEBAR,
+            fg=MUTED_DARK,
+            font=("Segoe UI", 7, "bold")
+        ).pack(
+            anchor="w"
+        )
+
+        tk.Label(
+            bottom,
+            text=TIER_LABELS.get(
+                tier,
+                tier
+            ),
+            bg=SIDEBAR,
+            fg=TEXT,
+            font=("Segoe UI", 9, "bold")
+        ).pack(
+            anchor="w",
+            pady=(3, 0)
+        )
+
+        # ----------------------------------------------------
+        # Main content
+        # ----------------------------------------------------
+
+        main = tk.Frame(
+            self,
+            bg=BG
+        )
+
+        main.pack(
+            side="left",
+            fill="both",
+            expand=True
+        )
+
+        # Header
+
+        header = tk.Frame(
+            main,
+            bg=BG,
+            height=78
+        )
+
+        header.pack(
+            fill="x"
+        )
+
+        header.pack_propagate(False)
+
+        title_area = tk.Frame(
+            header,
+            bg=BG
+        )
+
+        title_area.pack(
+            side="left",
+            padx=30,
+            pady=18
+        )
+
+        tk.Label(
+            title_area,
+            text="Overview",
+            bg=BG,
+            fg=WHITE,
+            font=("Segoe UI", 19, "bold")
+        ).pack(
+            anchor="w"
+        )
+
+        tk.Label(
+            title_area,
+            text="File and URL security analysis",
+            bg=BG,
+            fg=MUTED,
+            font=("Segoe UI", 9)
+        ).pack(
+            anchor="w"
+        )
+
+        status_area = tk.Frame(
+            header,
+            bg=BG
+        )
+
+        status_area.pack(
+            side="right",
+            padx=25
+        )
+
+        api_set = bool(
+            self.cfg.get(
+                "vt_api_key"
+            )
+        )
+
+        dot = "●"
+
+        tk.Label(
+            status_area,
+            text=dot,
+            bg=BG,
+            fg=GREEN if api_set else RED,
+            font=("Segoe UI", 9)
+        ).pack(
+            side="left"
+        )
+
+        tk.Label(
+            status_area,
+            text=(
+                "Connected"
+                if api_set
+                else "Not connected"
+            ),
+            bg=BG,
+            fg=MUTED,
+            font=("Segoe UI", 9)
+        ).pack(
+            side="left",
+            padx=(5, 0)
+        )
+
+        # Content scroll-ish frame
+
+        content = tk.Frame(
+            main,
+            bg=BG
+        )
+
+        content.pack(
+            fill="both",
+            expand=True,
+            padx=30,
+            pady=(0, 25)
+        )
+
+        # ----------------------------------------------------
+        # Scan area
+        # ----------------------------------------------------
+
+        scan_panel, scan = self.make_panel(
+            content,
+            padx=22,
+            pady=20
+        )
+
+        scan_panel.pack(
+            fill="x",
+            pady=(0, 15)
+        )
+
+        tk.Label(
+            scan,
+            text="SCAN",
+            bg=PANEL,
+            fg=MUTED,
+            font=("Segoe UI", 8, "bold")
+        ).pack(
+            anchor="w"
+        )
+
+        tk.Label(
+            scan,
+            text="Analyze a file or URL",
+            bg=PANEL,
+            fg=WHITE,
+            font=("Segoe UI", 15, "bold")
+        ).pack(
+            anchor="w",
+            pady=(2, 4)
+        )
+
+        tk.Label(
+            scan,
+            text=(
+                "Check your target against VirusTotal's "
+                "multi-engine analysis."
+            ),
+            bg=PANEL,
+            fg=MUTED,
+            font=("Segoe UI", 9)
+        ).pack(
+            anchor="w"
+        )
+
+        actions = tk.Frame(
+            scan,
+            bg=PANEL
+        )
+
+        actions.pack(
+            fill="x",
+            pady=(18, 0)
+        )
+
+        self.make_button(
+            actions,
+            "Scan a file",
+            self._scan_file_dialog,
+            primary=True
+        ).pack(
+            side="left"
+        )
+
+        self.make_button(
+            actions,
+            "Scan a URL",
+            self._scan_url_dialog
+        ).pack(
+            side="left",
+            padx=(8, 0)
+        )
+
+        self.scan_progress = ttk.Progressbar(
+            actions,
+            style="ZX.Horizontal.TProgressbar",
+            mode="indeterminate",
+            length=190
+        )
+
+        self.scan_progress.pack(
+            side="right",
+            pady=4
+        )
+
+        # ----------------------------------------------------
+        # Stats
+        # ----------------------------------------------------
+
+        stats = tk.Frame(
+            content,
+            bg=BG
+        )
+
+        stats.pack(
+            fill="x",
+            pady=(0, 15)
+        )
+
+        self.stat_labels = {}
+
+        cards = [
+            ("total", "TOTAL SCANS", "0"),
+            ("clean", "CLEAN", "0"),
+            ("flagged", "FLAGGED", "0"),
+            ("last", "LAST SCAN", "—"),
+        ]
+
+        for i, (key, title, value) in enumerate(cards):
+
+            card = tk.Frame(
+                stats,
+                bg=PANEL,
+                highlightbackground=BORDER,
+                highlightthickness=1
+            )
+
+            card.grid(
+                row=0,
+                column=i,
+                sticky="nsew",
+                padx=(
+                    0 if i == 0 else 5,
+                    5 if i < 3 else 0
+                )
+            )
+
+            stats.columnconfigure(
+                i,
+                weight=1
+            )
+
+            tk.Label(
+                card,
+                text=title,
+                bg=PANEL,
+                fg=MUTED,
+                font=("Segoe UI", 7, "bold")
+            ).pack(
+                anchor="w",
+                padx=15,
+                pady=(13, 0)
+            )
+
+            val = tk.Label(
+                card,
+                text=value,
+                bg=PANEL,
+                fg=WHITE,
+                font=("Segoe UI", 17, "bold")
+            )
+
+            val.pack(
+                anchor="w",
+                padx=15,
+                pady=(4, 13)
+            )
+
+            self.stat_labels[key] = val
+
+        # ----------------------------------------------------
+        # Lower panels
+        # ----------------------------------------------------
+
+        lower = tk.Frame(
+            content,
+            bg=BG
+        )
+
+        lower.pack(
+            fill="both",
+            expand=True
+        )
+
+        # Protection panel
+
+        protection_panel = tk.Frame(
+            lower,
+            bg=PANEL,
+            highlightbackground=BORDER,
+            highlightthickness=1,
+            width=260
+        )
+
+        protection_panel.pack(
+            side="left",
+            fill="y",
+            padx=(0, 8)
+        )
+
+        protection_panel.pack_propagate(False)
+
+        tk.Label(
+            protection_panel,
+            text="PROTECTION",
+            bg=PANEL,
+            fg=MUTED,
+            font=("Segoe UI", 8, "bold")
+        ).pack(
+            anchor="w",
+            padx=18,
+            pady=(18, 0)
+        )
+
+        self.protection_canvas = tk.Canvas(
+            protection_panel,
+            width=180,
+            height=180,
+            bg=PANEL,
+            highlightthickness=0
+        )
+
+        self.protection_canvas.pack(
+            pady=5
+        )
+
+        self.protection_status = tk.Label(
+            protection_panel,
+            text="No scans yet",
+            bg=PANEL,
+            fg=MUTED,
+            font=("Segoe UI", 9)
+        )
+
+        self.protection_status.pack()
+
+        # History
+
+        history_panel = tk.Frame(
+            lower,
+            bg=PANEL,
+            highlightbackground=BORDER,
+            highlightthickness=1
+        )
+
+        history_panel.pack(
+            side="left",
+            fill="both",
+            expand=True
+        )
+
+        history_header = tk.Frame(
+            history_panel,
+            bg=PANEL
+        )
+
+        history_header.pack(
+            fill="x",
+            padx=18,
+            pady=15
+        )
+
+        tk.Label(
+            history_header,
+            text="RECENT SCANS",
+            bg=PANEL,
+            fg=MUTED,
+            font=("Segoe UI", 8, "bold")
+        ).pack(
+            side="left"
+        )
+
+        self.tree = ttk.Treeview(
+            history_panel,
+            style="ZX.Treeview",
+            columns=(
+                "target",
+                "type",
+                "result",
+                "detections",
+                "time"
+            ),
+            show="headings"
+        )
+
+        columns = [
             ("target", "Target", 260),
-            ("type", "Type", 60),
-            ("result", "Result", 100),
-            ("detections", "Detections", 100),
-            ("time", "Scanned", 140),
-        ]:
-            self.tree.heading(col, text=label)
-            self.tree.column(col, width=width, anchor="w")
-        self.tree.pack(fill="both", expand=True)
-        self.tree.tag_configure("clean", foreground=OK)
-        self.tree.tag_configure("flagged", foreground=DANGER)
+            ("type", "Type", 65),
+            ("result", "Result", 90),
+            ("detections", "Detections", 85),
+            ("time", "Scanned", 135),
+        ]
 
-        self.status_var = tk.StringVar(value="Ready.")
-        status_bar = ttk.Label(self, textvariable=self.status_var, style="Muted.TLabel",
-                                padding=(20, 6))
-        status_bar.pack(fill="x", side="bottom")
+        for col, title, width in columns:
+
+            self.tree.heading(
+                col,
+                text=title
+            )
+
+            self.tree.column(
+                col,
+                width=width,
+                anchor="w"
+            )
+
+        self.tree.tag_configure(
+            "clean",
+            foreground=GREEN
+        )
+
+        self.tree.tag_configure(
+            "flagged",
+            foreground=RED
+        )
+
+        self.tree.pack(
+            fill="both",
+            expand=True,
+            padx=10,
+            pady=(0, 10)
+        )
+
+        self.status_var = tk.StringVar(
+            value="Ready."
+        )
+
+        status_bar = tk.Frame(
+            main,
+            bg=SIDEBAR,
+            height=30
+        )
+
+        status_bar.pack(
+            fill="x",
+            side="bottom"
+        )
+
+        status_bar.pack_propagate(False)
+
+        tk.Label(
+            status_bar,
+            textvariable=self.status_var,
+            bg=SIDEBAR,
+            fg=MUTED,
+            font=("Segoe UI", 8)
+        ).pack(
+            anchor="w",
+            padx=15,
+            pady=7
+        )
 
         self._refresh_stats()
+
         self._start_license_watchdog()
 
+    # ========================================================
+    # Sidebar
+    # ========================================================
+
+    def _sidebar_button(
+        self,
+        parent,
+        text,
+        command,
+        active=False
+    ):
+
+        bg = PANEL_LIGHT if active else SIDEBAR
+        fg = WHITE if active else TEXT
+
+        btn = tk.Button(
+            parent,
+            text=text,
+            command=command,
+            anchor="w",
+            bg=bg,
+            fg=fg,
+            activebackground=PANEL_HOVER,
+            activeforeground=WHITE,
+            relief="flat",
+            bd=0,
+            highlightthickness=0,
+            cursor="hand2",
+            font=("Segoe UI", 9),
+            padx=22,
+            pady=9
+        )
+
+        btn.pack(
+            fill="x",
+            padx=10,
+            pady=1
+        )
+
+        return btn
+
+    # ========================================================
+    # Stats / graphics
+    # ========================================================
+
+    def _refresh_stats(self):
+
+        total = len(
+            self.scan_history
+        )
+
+        clean = sum(
+            1
+            for e in self.scan_history
+            if e["result"] == "CLEAN"
+        )
+
+        flagged = sum(
+            1
+            for e in self.scan_history
+            if e["result"] == "FLAGGED"
+        )
+
+        last = (
+            self.scan_history[-1]["time"]
+            if self.scan_history
+            else "—"
+        )
+
+        self.stat_labels[
+            "total"
+        ].configure(
+            text=str(total)
+        )
+
+        self.stat_labels[
+            "clean"
+        ].configure(
+            text=str(clean)
+        )
+
+        self.stat_labels[
+            "flagged"
+        ].configure(
+            text=str(flagged)
+        )
+
+        self.stat_labels[
+            "last"
+        ].configure(
+            text=last
+        )
+
+        self._draw_protection_ring(
+            clean,
+            flagged
+        )
+
+    def _draw_protection_ring(
+        self,
+        clean,
+        flagged
+    ):
+
+        c = self.protection_canvas
+
+        c.delete("all")
+
+        total = clean + flagged
+
+        cx = 90
+        cy = 82
+        radius = 55
+
+        bbox = (
+            cx - radius,
+            cy - radius,
+            cx + radius,
+            cy + radius
+        )
+
+        if total == 0:
+
+            c.create_oval(
+                *bbox,
+                outline=BORDER_LIGHT,
+                width=9
+            )
+
+            percent = "—"
+
+        else:
+
+            clean_ratio = clean / total
+
+            clean_extent = (
+                360 * clean_ratio
+            )
+
+            c.create_arc(
+                *bbox,
+                start=90,
+                extent=-clean_extent,
+                style="arc",
+                outline=GREEN,
+                width=9
+            )
+
+            c.create_arc(
+                *bbox,
+                start=90 - clean_extent,
+                extent=-(360 - clean_extent),
+                style="arc",
+                outline=RED,
+                width=9
+            )
+
+            percent = (
+                f"{round(clean_ratio * 100)}%"
+            )
+
+        c.create_text(
+            cx,
+            cy - 5,
+            text=percent,
+            fill=WHITE,
+            font=("Segoe UI", 18, "bold")
+        )
+
+        c.create_text(
+            cx,
+            cy + 18,
+            text="clean",
+            fill=MUTED,
+            font=("Segoe UI", 8)
+        )
+
+        if total == 0:
+
+            self.protection_status.configure(
+                text="Waiting for first scan"
+            )
+
+        elif flagged:
+
+            self.protection_status.configure(
+                text=f"{flagged} flagged result(s)",
+                fg=RED
+            )
+
+        else:
+
+            self.protection_status.configure(
+                text="No detections",
+                fg=GREEN
+            )
+
+    # ========================================================
+    # License watchdog
+    # ========================================================
+
     def _start_license_watchdog(self):
-        """Keeps the plan/expiry label live and boots back to the license
-        gate the moment the current key expires (matters most for the
-        10-minute TRIAL tier, which can expire mid-session)."""
-        tier = self.cfg.get("license_tier")
-        activated_at = self.cfg.get("activated_at", 0)
+
+        tier = self.cfg.get(
+            "license_tier"
+        )
+
+        activated_at = self.cfg.get(
+            "activated_at",
+            0
+        )
 
         def tick():
-            if license_is_expired(self.cfg):
+
+            if not self.winfo_exists():
+                return
+
+            if license_is_expired(
+                self.cfg
+            ):
+
                 self._route_startup()
                 return
-            self.expiry_var.set(format_expiry(tier, activated_at))
-            self.after(1000, tick)
+
+            self.after(
+                1000,
+                tick
+            )
 
         tick()
 
-    def _refresh_stats(self):
-        total = len(self.scan_history)
-        clean = sum(1 for e in self.scan_history if e["result"] == "CLEAN")
-        flagged = sum(1 for e in self.scan_history if e["result"] == "FLAGGED")
-        last = self.scan_history[-1]["time"] if self.scan_history else "—"
-        self.stat_cards["total"].configure(text=str(total))
-        self.stat_cards["clean"].configure(text=str(clean))
-        self.stat_cards["flagged"].configure(text=str(flagged))
-        self.stat_cards["last"].configure(text=last)
-        self._draw_protection_ring(clean, flagged)
-        self._draw_detection_bars()
-
-    def _draw_protection_ring(self, clean, flagged):
-        c = self.ring_canvas
-        c.delete("all")
-        total = clean + flagged
-        pct_clean = (clean / total) if total else 1.0
-        cx, cy, r = 70, 70, 50
-        bbox = (cx - r, cy - r, cx + r, cy + r)
-        if total == 0:
-            c.create_oval(*bbox, outline=MUTED, width=10)
-        else:
-            clean_extent = 360 * pct_clean
-            c.create_arc(*bbox, start=90, extent=-clean_extent, style="arc",
-                         outline=OK, width=10)
-            c.create_arc(*bbox, start=90 - clean_extent, extent=-(360 - clean_extent),
-                         style="arc", outline=DANGER, width=10)
-        pct_text = f"{round(pct_clean * 100)}%" if total else "—"
-        c.create_text(cx, cy - 6, text=pct_text, fill=FG, font=("Segoe UI", 16, "bold"))
-        c.create_text(cx, cy + 14, text="clean", fill=MUTED, font=("Segoe UI", 8))
-
-    def _draw_detection_bars(self):
-        c = self.bars_canvas
-        c.delete("all")
-        recent = list(reversed(self.scan_history[-6:]))
-        if not recent:
-            c.create_text(190, 70, text="No scans yet", fill=MUTED, font=("Segoe UI", 9))
-            return
-        max_det = max((e["detections"] for e in recent), default=1) or 1
-        row_h = 20
-        bar_max_w = 220
-        label_w = 110
-        for i, entry in enumerate(recent):
-            y = 12 + i * row_h
-            name = entry["target"]
-            short = name if len(name) <= 16 else name[:14] + "…"
-            c.create_text(4, y, text=short, fill=MUTED, font=("Segoe UI", 8), anchor="w")
-            bar_w = int((entry["detections"] / max_det) * bar_max_w) if entry["detections"] else 2
-            color = DANGER if entry["detections"] > 0 else OK
-            c.create_rectangle(label_w, y - 6, label_w + bar_w, y + 6, fill=color, outline="")
-            c.create_text(label_w + bar_w + 8, y, text=str(entry["detections"]), fill=FG,
-                          font=("Segoe UI", 8), anchor="w")
+    # ========================================================
+    # Settings
+    # ========================================================
 
     def _open_settings(self):
-        # Reuses the startup API key screen (with live Verify) so changing
-        # the key later goes through the same tested flow as first setup.
-        self._show_api_key_gate()
+
+        win = tk.Toplevel(self)
+
+        win.title(
+            "ZX.AV — Settings"
+        )
+
+        win.geometry(
+            "560x430"
+        )
+
+        win.configure(
+            bg=BG
+        )
+
+        win.transient(
+            self
+        )
+
+        tk.Label(
+            win,
+            text="Settings",
+            bg=BG,
+            fg=WHITE,
+            font=("Segoe UI", 19, "bold")
+        ).pack(
+            anchor="w",
+            padx=30,
+            pady=(28, 3)
+        )
+
+        tk.Label(
+            win,
+            text="VirusTotal connection",
+            bg=BG,
+            fg=MUTED,
+            font=("Segoe UI", 9)
+        ).pack(
+            anchor="w",
+            padx=30
+        )
+
+        card = tk.Frame(
+            win,
+            bg=PANEL,
+            highlightbackground=BORDER,
+            highlightthickness=1
+        )
+
+        card.pack(
+            fill="x",
+            padx=30,
+            pady=22
+        )
+
+        tk.Label(
+            card,
+            text="API KEY",
+            bg=PANEL,
+            fg=MUTED,
+            font=("Segoe UI", 8, "bold")
+        ).pack(
+            anchor="w",
+            padx=20,
+            pady=(20, 5)
+        )
+
+        key_var = tk.StringVar(
+            value=self.cfg.get(
+                "vt_api_key",
+                ""
+            )
+        )
+
+        entry = tk.Entry(
+            card,
+            textvariable=key_var,
+            show="•",
+            bg=PANEL_LIGHT,
+            fg=WHITE,
+            insertbackground=WHITE,
+            relief="flat",
+            bd=0,
+            font=("Consolas", 10)
+        )
+
+        entry.pack(
+            fill="x",
+            padx=20,
+            ipady=10
+        )
+
+        status = tk.Label(
+            card,
+            text="",
+            bg=PANEL,
+            fg=MUTED,
+            font=("Segoe UI", 9)
+        )
+
+        status.pack(
+            anchor="w",
+            padx=20,
+            pady=10
+        )
+
+        def verify():
+
+            key = key_var.get().strip()
+
+            if not key:
+                status.configure(
+                    text="Enter an API key.",
+                    fg=RED
+                )
+                return
+
+            status.configure(
+                text="Checking...",
+                fg=MUTED
+            )
+
+            def worker():
+
+                try:
+
+                    vt_request(
+                        f"{VT_BASE}/users/{key}",
+                        key
+                    )
+
+                    self.after(
+                        0,
+                        lambda: status.configure(
+                            text="API key verified.",
+                            fg=GREEN
+                        )
+                    )
+
+                except Exception:
+
+                    self.after(
+                        0,
+                        lambda: status.configure(
+                            text="Unable to verify API key.",
+                            fg=RED
+                        )
+                    )
+
+            threading.Thread(
+                target=worker,
+                daemon=True
+            ).start()
+
+        def save():
+
+            key = key_var.get().strip()
+
+            if not key:
+
+                status.configure(
+                    text="Enter an API key.",
+                    fg=RED
+                )
+
+                return
+
+            self.cfg[
+                "vt_api_key"
+            ] = key
+
+            save_config(
+                self.cfg
+            )
+
+            win.destroy()
+
+            self._build_main_ui()
+
+        buttons = tk.Frame(
+            win,
+            bg=BG
+        )
+
+        buttons.pack(
+            fill="x",
+            padx=30
+        )
+
+        self.make_button(
+            buttons,
+            "Verify",
+            verify,
+            small=True
+        ).pack(
+            side="left"
+        )
+
+        self.make_button(
+            buttons,
+            "Save",
+            save,
+            primary=True
+        ).pack(
+            side="right"
+        )
+
+    # ========================================================
+    # File scan
+    # ========================================================
 
     def _require_api_key(self):
-        key = self.cfg.get("vt_api_key")
+
+        key = self.cfg.get(
+            "vt_api_key"
+        )
+
         if not key:
+
             messagebox.showwarning(
                 "API key required",
-                "Add your VirusTotal API key in Settings before scanning.",
+                "Add your VirusTotal API key in Settings."
             )
+
             self._open_settings()
+
             return None
+
         return key
 
-    # ---------------- File scan ----------------
     def _scan_file_dialog(self):
+
         api_key = self._require_api_key()
+
         if not api_key:
             return
-        path = filedialog.askopenfilename(title="Choose a file to scan")
+
+        path = filedialog.askopenfilename(
+            title="Choose a file to scan"
+        )
+
         if not path:
             return
-        self._run_async(self._scan_file, path, api_key)
 
-    def _scan_file(self, path, api_key):
-        self._set_status(f"Hashing {os.path.basename(path)}...")
-        file_hash = sha256_of_file(path)
+        self._run_async(
+            self._scan_file,
+            path,
+            api_key
+        )
+
+    def _scan_file(
+        self,
+        path,
+        api_key
+    ):
+
+        name = os.path.basename(path)
+
+        self._set_status(
+            f"Hashing {name}..."
+        )
 
         try:
-            self._set_status("Checking VirusTotal for an existing report...")
-            report = vt_lookup_file_hash(file_hash, api_key)
-            stats = report["data"]["attributes"]["last_analysis_stats"]
-        except urlerror.HTTPError as e:
-            if e.code == 404:
-                self._set_status("No existing report — uploading file for a fresh scan...")
-                analysis_id = vt_upload_file(path, api_key)
-                stats = self._poll_analysis(analysis_id, api_key)
-            else:
-                self._scan_error(f"VirusTotal error ({e.code}): {e.reason}")
-                return
+
+            file_hash = sha256_of_file(
+                path
+            )
+
+            self._set_status(
+                "Checking VirusTotal..."
+            )
+
+            try:
+
+                report = vt_lookup_file_hash(
+                    file_hash,
+                    api_key
+                )
+
+                stats = report[
+                    "data"
+                ][
+                    "attributes"
+                ][
+                    "last_analysis_stats"
+                ]
+
+            except urlerror.HTTPError as e:
+
+                if e.code != 404:
+                    raise
+
+                self._set_status(
+                    "File not found in VirusTotal. Uploading..."
+                )
+
+                analysis_id = vt_upload_file(
+                    path,
+                    api_key
+                )
+
+                stats = self._poll_analysis(
+                    analysis_id,
+                    api_key
+                )
+
+            malicious = stats.get(
+                "malicious",
+                0
+            )
+
+            suspicious = stats.get(
+                "suspicious",
+                0
+            )
+
+            detections = (
+                malicious +
+                suspicious
+            )
+
+            result = (
+                "FLAGGED"
+                if detections > 0
+                else "CLEAN"
+            )
+
+            self._record_result(
+                name,
+                "File",
+                result,
+                detections
+            )
+
+            self._set_status(
+                f"{name}: {result} · "
+                f"{detections} detections"
+            )
+
         except Exception as e:
-            self._scan_error(f"Scan failed: {e}")
-            return
 
-        malicious = stats.get("malicious", 0)
-        suspicious = stats.get("suspicious", 0)
-        total_flags = malicious + suspicious
-        result = "FLAGGED" if total_flags > 0 else "CLEAN"
-        self._record_result(os.path.basename(path), "File", result, total_flags)
-        self._set_status(f"Done — {os.path.basename(path)}: {result} ({total_flags} detections).")
+            self._scan_error(
+                f"Scan failed: {e}"
+            )
 
-    # ---------------- URL scan ----------------
+    # ========================================================
+    # URL scan
+    # ========================================================
+
     def _scan_url_dialog(self):
+
         api_key = self._require_api_key()
+
         if not api_key:
             return
-        target = simpledialog.askstring("Scan a URL", "Enter the URL to check:", parent=self)
+
+        target = simpledialog.askstring(
+            "Scan URL",
+            "Enter the URL to check:",
+            parent=self
+        )
+
         if not target:
             return
-        self._run_async(self._scan_url, target.strip(), api_key)
 
-    def _scan_url(self, target, api_key):
+        self._run_async(
+            self._scan_url,
+            target.strip(),
+            api_key
+        )
+
+    def _scan_url(
+        self,
+        target,
+        api_key
+    ):
+
         try:
-            self._set_status(f"Submitting {target} to VirusTotal...")
-            analysis_id = vt_submit_url(target, api_key)
-            stats = self._poll_analysis(analysis_id, api_key)
+
+            self._set_status(
+                f"Submitting URL..."
+            )
+
+            analysis_id = vt_submit_url(
+                target,
+                api_key
+            )
+
+            stats = self._poll_analysis(
+                analysis_id,
+                api_key
+            )
+
+            malicious = stats.get(
+                "malicious",
+                0
+            )
+
+            suspicious = stats.get(
+                "suspicious",
+                0
+            )
+
+            detections = (
+                malicious +
+                suspicious
+            )
+
+            result = (
+                "FLAGGED"
+                if detections > 0
+                else "CLEAN"
+            )
+
+            self._record_result(
+                target,
+                "URL",
+                result,
+                detections
+            )
+
+            self._set_status(
+                f"{target}: {result} · "
+                f"{detections} detections"
+            )
+
         except Exception as e:
-            self._scan_error(f"Scan failed: {e}")
-            return
 
-        malicious = stats.get("malicious", 0)
-        suspicious = stats.get("suspicious", 0)
-        total_flags = malicious + suspicious
-        result = "FLAGGED" if total_flags > 0 else "CLEAN"
-        self._record_result(target, "URL", result, total_flags)
-        self._set_status(f"Done — {target}: {result} ({total_flags} detections).")
+            self._scan_error(
+                f"Scan failed: {e}"
+            )
 
-    # ---------------- Shared helpers ----------------
-    def _poll_analysis(self, analysis_id, api_key, timeout=90, interval=3):
+    # ========================================================
+    # Analysis polling
+    # ========================================================
+
+    def _poll_analysis(
+        self,
+        analysis_id,
+        api_key,
+        timeout=90,
+        interval=3
+    ):
+
         elapsed = 0
-        while elapsed < timeout:
-            data = vt_get_analysis(analysis_id, api_key)
-            status = data["data"]["attributes"]["status"]
-            if status == "completed":
-                return data["data"]["attributes"]["stats"]
-            self._set_status(f"Analysis in progress ({status})...")
-            time.sleep(interval)
-            elapsed += interval
-        raise TimeoutError("VirusTotal analysis did not complete in time.")
 
-    def _record_result(self, target, kind, result, detections):
+        while elapsed < timeout:
+
+            data = vt_get_analysis(
+                analysis_id,
+                api_key
+            )
+
+            status = data[
+                "data"
+            ][
+                "attributes"
+            ][
+                "status"
+            ]
+
+            if status == "completed":
+
+                return data[
+                    "data"
+                ][
+                    "attributes"
+                ][
+                    "stats"
+                ]
+
+            self._set_status(
+                f"VirusTotal analysis: {status}"
+            )
+
+            time.sleep(
+                interval
+            )
+
+            elapsed += interval
+
+        raise TimeoutError(
+            "VirusTotal analysis did not complete in time."
+        )
+
+    # ========================================================
+    # History
+    # ========================================================
+
+    def _record_result(
+        self,
+        target,
+        kind,
+        result,
+        detections
+    ):
+
         entry = {
             "target": target,
             "type": kind,
             "result": result,
             "detections": detections,
-            "time": time.strftime("%Y-%m-%d %H:%M"),
+            "time": time.strftime(
+                "%Y-%m-%d %H:%M"
+            ),
         }
-        self.scan_history.append(entry)
-        tag = "flagged" if result == "FLAGGED" else "clean"
-        self.after(0, lambda: self.tree.insert(
-            "", 0,
-            values=(entry["target"], entry["type"], entry["result"], entry["detections"], entry["time"]),
-            tags=(tag,),
-        ))
-        self.after(0, self._refresh_stats)
 
-    def _scan_error(self, message):
-        self._set_status(message)
-        self.after(0, lambda: messagebox.showerror("Scan error", message))
+        self.scan_history.append(
+            entry
+        )
 
-    def _set_status(self, text):
-        self.after(0, lambda: self.status_var.set(text))
+        tag = (
+            "flagged"
+            if result == "FLAGGED"
+            else "clean"
+        )
 
-    def _run_async(self, fn, *args):
-        self.progress.start(12)
+        self.after(
+            0,
+            lambda: self.tree.insert(
+                "",
+                0,
+                values=(
+                    entry["target"],
+                    entry["type"],
+                    entry["result"],
+                    entry["detections"],
+                    entry["time"],
+                ),
+                tags=(tag,)
+            )
+        )
 
-        def wrapper():
+        self.after(
+            0,
+            self._refresh_stats
+        )
+
+    # ========================================================
+    # Async / progress
+    # ========================================================
+
+    def _run_async(
+        self,
+        fn,
+        *args
+    ):
+
+        self.scan_progress.start(
+            12
+        )
+
+        def worker():
+
             try:
                 fn(*args)
+
             finally:
-                self.after(0, self.progress.stop)
 
-        threading.Thread(target=wrapper, daemon=True).start()
+                self.after(
+                    0,
+                    self.scan_progress.stop
+                )
 
+        threading.Thread(
+            target=worker,
+            daemon=True
+        ).start()
+
+    def _set_status(
+        self,
+        text
+    ):
+
+        self.after(
+            0,
+            lambda: self.status_var.set(
+                text
+            )
+        )
+
+    def _scan_error(
+        self,
+        message
+    ):
+
+        self._set_status(
+            message
+        )
+
+        self.after(
+            0,
+            lambda: messagebox.showerror(
+                "Scan error",
+                message
+            )
+        )
+
+    # ========================================================
+    # About / changelog
+    # ========================================================
+
+    def _show_about(self):
+
+        tier = self.cfg.get(
+            "license_tier",
+            "UNKNOWN"
+        )
+
+        messagebox.showinfo(
+            "About ZX.AV",
+            f"{APP_NAME}\n"
+            f"{APP_TAGLINE}\n\n"
+            f"Version {APP_VERSION}\n\n"
+            "File and URL scanner powered by "
+            "the VirusTotal API.\n\n"
+            f"Plan: {TIER_LABELS.get(tier, tier)}"
+        )
+
+    def _show_changelog(self):
+
+        win = tk.Toplevel(
+            self
+        )
+
+        win.title(
+            "ZX.AV — What's new"
+        )
+
+        win.geometry(
+            "650x500"
+        )
+
+        win.configure(
+            bg=BG
+        )
+
+        text = tk.Text(
+            win,
+            bg=PANEL,
+            fg=TEXT,
+            insertbackground=WHITE,
+            selectbackground=PANEL_HOVER,
+            font=("Consolas", 9),
+            wrap="word",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=18,
+            pady=18
+        )
+
+        text.pack(
+            fill="both",
+            expand=True,
+            padx=15,
+            pady=15
+        )
+
+        text.insert(
+            "1.0",
+            load_changelog()
+        )
+
+        text.configure(
+            state="disabled"
+        )
+
+
+# ============================================================
+# Launch
+# ============================================================
 
 if __name__ == "__main__":
+
     app = ZXAVApp()
+
     app.mainloop()
+```
