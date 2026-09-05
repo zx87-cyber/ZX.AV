@@ -1,4 +1,3 @@
-```python
 import hashlib
 import json
 import os
@@ -2662,4 +2661,3 @@ if __name__ == "__main__":
     app = ZXAVApp()
 
     app.mainloop()
-```
