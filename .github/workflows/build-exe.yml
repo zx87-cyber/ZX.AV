@@ -53,8 +53,26 @@ jobs:
         run: |
           mkdir -p AppDir/usr/bin
           cp dist/ZXAV AppDir/usr/bin/ZXAV
-          printf '%s\n' '[Desktop Entry]' 'Name=ZX.AV' 'Exec=ZXAV' 'Type=Application' 'Categories=Utility;System;' > AppDir/ZXAV.desktop
-          printf '%s\n' '#!/bin/sh' 'HERE="$(dirname "$(readlink -f "$0")")"' 'exec "$HERE/usr/bin/ZXAV" "$@"' > AppDir/AppRun
+
+          printf '%s\n' \
+            '[Desktop Entry]' \
+            'Name=ZX.AV' \
+            'Exec=ZXAV' \
+            'Icon=ZXAV' \
+            'Type=Application' \
+            'Categories=Utility;' \
+            > AppDir/ZXAV.desktop
+
+          printf '%s\n' \
+            '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"></svg>' \
+            > AppDir/ZXAV.svg
+
+          printf '%s\n' \
+            '#!/bin/sh' \
+            'HERE="$(dirname "$(readlink -f "$0")")"' \
+            'exec "$HERE/usr/bin/ZXAV" "$@"' \
+            > AppDir/AppRun
+
           chmod +x AppDir/AppRun
 
       - name: Download appimagetool
