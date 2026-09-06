@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 from urllib import request as urlrequest
 from urllib import error as urlerror
+from urllib.parse import urlencode
 
 
 # ============================================================
@@ -17,7 +18,7 @@ from urllib import error as urlerror
 
 APP_NAME = "ZX.AV"
 APP_TAGLINE = "SECURED BY ZX.AI"
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.0.1"
 
 
 # ============================================================
@@ -65,7 +66,6 @@ BORDER = "#2B2D30"
 BORDER_LIGHT = "#36383B"
 
 # Status colours only.
-# These are deliberately NOT part of the main theme.
 GREEN = "#55B982"
 RED = "#D96565"
 YELLOW = "#C7A65B"
@@ -99,7 +99,11 @@ def resource_path(relative_path):
 def load_config():
     if os.path.exists(CONFIG_PATH):
         try:
-            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            with open(
+                CONFIG_PATH,
+                "r",
+                encoding="utf-8"
+            ) as f:
                 return json.load(f)
         except Exception:
             return {}
@@ -108,10 +112,21 @@ def load_config():
 
 
 def save_config(cfg):
-    os.makedirs(CONFIG_DIR, exist_ok=True)
+    os.makedirs(
+        CONFIG_DIR,
+        exist_ok=True
+    )
 
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, indent=2)
+    with open(
+        CONFIG_PATH,
+        "w",
+        encoding="utf-8"
+    ) as f:
+        json.dump(
+            cfg,
+            f,
+            indent=2
+        )
 
 
 def load_license_keys():
@@ -150,7 +165,10 @@ def validate_license(key):
     return None
 
 
-def compute_expiry(tier, activated_at):
+def compute_expiry(
+    tier,
+    activated_at
+):
     duration = TIER_DURATIONS.get(tier)
 
     if duration is None:
@@ -177,7 +195,10 @@ def license_is_expired(cfg):
     return time.time() >= expiry
 
 
-def format_expiry(tier, activated_at):
+def format_expiry(
+    tier,
+    activated_at
+):
     expiry = compute_expiry(
         tier,
         activated_at
@@ -196,6 +217,7 @@ def format_expiry(tier, activated_at):
             int(remaining),
             60
         )
+
         return f"Expires in {mins:02d}:{secs:02d}"
 
     return time.strftime(
@@ -243,9 +265,16 @@ def sha256_of_file(
 ):
     h = hashlib.sha256()
 
-    with open(path, "rb") as f:
+    with open(
+        path,
+        "rb"
+    ) as f:
+
         while True:
-            chunk = f.read(chunk_size)
+
+            chunk = f.read(
+                chunk_size
+            )
 
             if not chunk:
                 break
@@ -273,7 +302,10 @@ def vt_upload_file(
 
     filename = os.path.basename(path)
 
-    with open(path, "rb") as f:
+    with open(
+        path,
+        "rb"
+    ) as f:
         file_bytes = f.read()
 
     body = bytearray()
@@ -313,6 +345,7 @@ def vt_upload_file(
         req,
         timeout=120
     ) as resp:
+
         data = json.loads(
             resp.read().decode("utf-8")
         )
@@ -334,7 +367,9 @@ def vt_submit_url(
     target_url,
     api_key
 ):
-    body = f"url={target_url}".encode()
+    body = urlencode({
+        "url": target_url
+    }).encode()
 
     req = urlrequest.Request(
         f"{VT_BASE}/urls",
@@ -351,6 +386,7 @@ def vt_submit_url(
         req,
         timeout=30
     ) as resp:
+
         data = json.loads(
             resp.read().decode("utf-8")
         )
@@ -371,8 +407,14 @@ class ZXAVApp(tk.Tk):
             f"{APP_NAME} — {APP_TAGLINE}"
         )
 
-        self.geometry("1120x720")
-        self.minsize(900, 600)
+        self.geometry(
+            "1120x720"
+        )
+
+        self.minsize(
+            900,
+            600
+        )
 
         self.configure(
             bg=BG
@@ -382,7 +424,7 @@ class ZXAVApp(tk.Tk):
 
         self.scan_history = []
 
-        self.progress_animation = None
+        self.watchdog_job = None
 
         self._configure_ttk()
 
@@ -452,6 +494,7 @@ class ZXAVApp(tk.Tk):
     # ========================================================
 
     def clear_window(self):
+
         for widget in self.winfo_children():
             widget.destroy()
 
@@ -463,12 +506,16 @@ class ZXAVApp(tk.Tk):
         primary=False,
         small=False
     ):
+
         if primary:
+
             bg = WHITE
             fg = BG
             active_bg = "#D0D0D0"
             active_fg = BG
+
         else:
+
             bg = PANEL_LIGHT
             fg = TEXT
             active_bg = PANEL_HOVER
@@ -507,6 +554,7 @@ class ZXAVApp(tk.Tk):
         padx=18,
         pady=18
     ):
+
         frame = tk.Frame(
             parent,
             bg=PANEL,
@@ -528,41 +576,6 @@ class ZXAVApp(tk.Tk):
         )
 
         return frame, inner
-
-    def make_title(
-        self,
-        parent,
-        text,
-        size=20
-    ):
-        return tk.Label(
-            parent,
-            text=text,
-            bg=parent.cget("bg"),
-            fg=WHITE,
-            font=(
-                "Segoe UI",
-                size,
-                "bold"
-            )
-        )
-
-    def make_muted(
-        self,
-        parent,
-        text,
-        size=9
-    ):
-        return tk.Label(
-            parent,
-            text=text,
-            bg=parent.cget("bg"),
-            fg=MUTED,
-            font=(
-                "Segoe UI",
-                size
-            )
-        )
 
     # ========================================================
     # Startup routing
@@ -647,7 +660,7 @@ class ZXAVApp(tk.Tk):
         header.pack(
             fill="x",
             padx=45,
-            pady=35
+            pady=30
         )
 
         tk.Label(
@@ -668,7 +681,7 @@ class ZXAVApp(tk.Tk):
             font=("Segoe UI", 8, "bold")
         ).pack(
             anchor="w",
-            pady=(1, 0)
+            pady=(4, 0)
         )
 
         card = tk.Frame(
@@ -699,11 +712,14 @@ class ZXAVApp(tk.Tk):
         tk.Label(
             card,
             text=(
-                "Enter your ZX.AV license key to unlock the application."
+                "Enter your ZX.AV license key "
+                "to unlock the application."
             ),
             bg=PANEL,
             fg=MUTED,
-            font=("Segoe UI", 9)
+            font=("Segoe UI", 9),
+            wraplength=520,
+            justify="left"
         ).pack(
             anchor="w",
             padx=35,
@@ -799,7 +815,10 @@ class ZXAVApp(tk.Tk):
             if key in used_keys:
 
                 status.configure(
-                    text="This key has already been activated on this device.",
+                    text=(
+                        "This key has already been "
+                        "activated on this device."
+                    ),
                     fg=RED
                 )
 
@@ -817,7 +836,9 @@ class ZXAVApp(tk.Tk):
                 "activated_at"
             ] = time.time()
 
-            used_keys.append(key)
+            used_keys.append(
+                key
+            )
 
             self.cfg[
                 "used_keys"
@@ -873,7 +894,7 @@ class ZXAVApp(tk.Tk):
         header.pack(
             fill="x",
             padx=45,
-            pady=35
+            pady=30
         )
 
         tk.Label(
@@ -893,7 +914,8 @@ class ZXAVApp(tk.Tk):
             fg=MUTED,
             font=("Segoe UI", 8, "bold")
         ).pack(
-            anchor="w"
+            anchor="w",
+            pady=(4, 0)
         )
 
         card = tk.Frame(
@@ -924,8 +946,8 @@ class ZXAVApp(tk.Tk):
         tk.Label(
             card,
             text=(
-                "ZX.AV uses your VirusTotal API key to perform "
-                "file and URL scans."
+                "ZX.AV uses your VirusTotal API key "
+                "to perform file and URL scans."
             ),
             bg=PANEL,
             fg=MUTED,
@@ -1089,6 +1111,10 @@ class ZXAVApp(tk.Tk):
 
             self._build_main_ui()
 
+        def skip_for_now():
+
+            self._build_main_ui()
+
         self.make_button(
             buttons,
             "Verify",
@@ -1096,6 +1122,16 @@ class ZXAVApp(tk.Tk):
             small=True
         ).pack(
             side="left"
+        )
+
+        self.make_button(
+            buttons,
+            "Skip for now",
+            skip_for_now,
+            small=True
+        ).pack(
+            side="left",
+            padx=(8, 0)
         )
 
         self.make_button(
@@ -1162,10 +1198,9 @@ class ZXAVApp(tk.Tk):
             fg=MUTED,
             font=("Segoe UI", 7, "bold")
         ).pack(
-            anchor="w"
+            anchor="w",
+            pady=(4, 0)
         )
-
-        # Navigation
 
         tk.Label(
             sidebar,
@@ -1238,8 +1273,6 @@ class ZXAVApp(tk.Tk):
             self._show_about
         )
 
-        # Sidebar bottom
-
         bottom = tk.Frame(
             sidebar,
             bg=SIDEBAR
@@ -1281,6 +1314,28 @@ class ZXAVApp(tk.Tk):
             pady=(3, 0)
         )
 
+        activated_at = self.cfg.get(
+            "activated_at"
+        )
+
+        if activated_at:
+
+            expiry_text = format_expiry(
+                tier,
+                activated_at
+            )
+
+            tk.Label(
+                bottom,
+                text=expiry_text,
+                bg=SIDEBAR,
+                fg=MUTED,
+                font=("Segoe UI", 7)
+            ).pack(
+                anchor="w",
+                pady=(2, 0)
+            )
+
         # ----------------------------------------------------
         # Main content
         # ----------------------------------------------------
@@ -1296,12 +1351,15 @@ class ZXAVApp(tk.Tk):
             expand=True
         )
 
+        # ----------------------------------------------------
         # Header
+        # ----------------------------------------------------
 
+        # Increased from 78px so the subtitle has room.
         header = tk.Frame(
             main,
             bg=BG,
-            height=78
+            height=96
         )
 
         header.pack(
@@ -1318,7 +1376,7 @@ class ZXAVApp(tk.Tk):
         title_area.pack(
             side="left",
             padx=30,
-            pady=18
+            pady=16
         )
 
         tk.Label(
@@ -1326,11 +1384,12 @@ class ZXAVApp(tk.Tk):
             text="Overview",
             bg=BG,
             fg=WHITE,
-            font=("Segoe UI", 19, "bold")
+            font=("Segoe UI", 20, "bold")
         ).pack(
             anchor="w"
         )
 
+        # Fixed subtitle spacing.
         tk.Label(
             title_area,
             text="File and URL security analysis",
@@ -1338,7 +1397,8 @@ class ZXAVApp(tk.Tk):
             fg=MUTED,
             font=("Segoe UI", 9)
         ).pack(
-            anchor="w"
+            anchor="w",
+            pady=(5, 0)
         )
 
         status_area = tk.Frame(
@@ -1357,11 +1417,9 @@ class ZXAVApp(tk.Tk):
             )
         )
 
-        dot = "●"
-
         tk.Label(
             status_area,
-            text=dot,
+            text="●",
             bg=BG,
             fg=GREEN if api_set else RED,
             font=("Segoe UI", 9)
@@ -1384,7 +1442,9 @@ class ZXAVApp(tk.Tk):
             padx=(5, 0)
         )
 
-        # Content scroll-ish frame
+        # ----------------------------------------------------
+        # Content
+        # ----------------------------------------------------
 
         content = tk.Frame(
             main,
@@ -1395,7 +1455,7 @@ class ZXAVApp(tk.Tk):
             fill="both",
             expand=True,
             padx=30,
-            pady=(0, 25)
+            pady=(4, 25)
         )
 
         # ----------------------------------------------------
@@ -1510,7 +1570,11 @@ class ZXAVApp(tk.Tk):
             ("last", "LAST SCAN", "—"),
         ]
 
-        for i, (key, title, value) in enumerate(cards):
+        for i, (
+            key,
+            title,
+            value
+        ) in enumerate(cards):
 
             card = tk.Frame(
                 stats,
@@ -1560,7 +1624,9 @@ class ZXAVApp(tk.Tk):
                 pady=(4, 13)
             )
 
-            self.stat_labels[key] = val
+            self.stat_labels[
+                key
+            ] = val
 
         # ----------------------------------------------------
         # Lower panels
@@ -1576,7 +1642,9 @@ class ZXAVApp(tk.Tk):
             expand=True
         )
 
+        # ----------------------------------------------------
         # Protection panel
+        # ----------------------------------------------------
 
         protection_panel = tk.Frame(
             lower,
@@ -1592,7 +1660,9 @@ class ZXAVApp(tk.Tk):
             padx=(0, 8)
         )
 
-        protection_panel.pack_propagate(False)
+        protection_panel.pack_propagate(
+            False
+        )
 
         tk.Label(
             protection_panel,
@@ -1628,7 +1698,9 @@ class ZXAVApp(tk.Tk):
 
         self.protection_status.pack()
 
+        # ----------------------------------------------------
         # History
+        # ----------------------------------------------------
 
         history_panel = tk.Frame(
             lower,
@@ -1685,7 +1757,11 @@ class ZXAVApp(tk.Tk):
             ("time", "Scanned", 135),
         ]
 
-        for col, title, width in columns:
+        for (
+            col,
+            title,
+            width
+        ) in columns:
 
             self.tree.heading(
                 col,
@@ -1715,6 +1791,10 @@ class ZXAVApp(tk.Tk):
             pady=(0, 10)
         )
 
+        # ----------------------------------------------------
+        # Status bar
+        # ----------------------------------------------------
+
         self.status_var = tk.StringVar(
             value="Ready."
         )
@@ -1730,7 +1810,9 @@ class ZXAVApp(tk.Tk):
             side="bottom"
         )
 
-        status_bar.pack_propagate(False)
+        status_bar.pack_propagate(
+            False
+        )
 
         tk.Label(
             status_bar,
@@ -1760,8 +1842,17 @@ class ZXAVApp(tk.Tk):
         active=False
     ):
 
-        bg = PANEL_LIGHT if active else SIDEBAR
-        fg = WHITE if active else TEXT
+        bg = (
+            PANEL_LIGHT
+            if active
+            else SIDEBAR
+        )
+
+        fg = (
+            WHITE
+            if active
+            else TEXT
+        )
 
         btn = tk.Button(
             parent,
@@ -1854,7 +1945,9 @@ class ZXAVApp(tk.Tk):
 
         c = self.protection_canvas
 
-        c.delete("all")
+        c.delete(
+            "all"
+        )
 
         total = clean + flagged
 
@@ -1928,7 +2021,8 @@ class ZXAVApp(tk.Tk):
         if total == 0:
 
             self.protection_status.configure(
-                text="Waiting for first scan"
+                text="Waiting for first scan",
+                fg=MUTED
             )
 
         elif flagged:
@@ -1951,14 +2045,16 @@ class ZXAVApp(tk.Tk):
 
     def _start_license_watchdog(self):
 
-        tier = self.cfg.get(
-            "license_tier"
-        )
+        if self.watchdog_job:
 
-        activated_at = self.cfg.get(
-            "activated_at",
-            0
-        )
+            try:
+                self.after_cancel(
+                    self.watchdog_job
+                )
+            except Exception:
+                pass
+
+            self.watchdog_job = None
 
         def tick():
 
@@ -1969,10 +2065,13 @@ class ZXAVApp(tk.Tk):
                 self.cfg
             ):
 
+                self.watchdog_job = None
+
                 self._route_startup()
+
                 return
 
-            self.after(
+            self.watchdog_job = self.after(
                 1000,
                 tick
             )
@@ -1985,7 +2084,9 @@ class ZXAVApp(tk.Tk):
 
     def _open_settings(self):
 
-        win = tk.Toplevel(self)
+        win = tk.Toplevel(
+            self
+        )
 
         win.title(
             "ZX.AV — Settings"
@@ -1993,6 +2094,11 @@ class ZXAVApp(tk.Tk):
 
         win.geometry(
             "560x430"
+        )
+
+        win.resizable(
+            False,
+            False
         )
 
         win.configure(
@@ -2095,10 +2201,12 @@ class ZXAVApp(tk.Tk):
             key = key_var.get().strip()
 
             if not key:
+
                 status.configure(
                     text="Enter an API key.",
                     fg=RED
                 )
+
                 return
 
             status.configure(
@@ -2240,7 +2348,9 @@ class ZXAVApp(tk.Tk):
         api_key
     ):
 
-        name = os.path.basename(path)
+        name = os.path.basename(
+            path
+        )
 
         self._set_status(
             f"Hashing {name}..."
@@ -2364,7 +2474,7 @@ class ZXAVApp(tk.Tk):
         try:
 
             self._set_status(
-                f"Submitting URL..."
+                "Submitting URL..."
             )
 
             analysis_id = vt_submit_url(
