@@ -65,7 +65,6 @@ MUTED_DARK = "#65686C"
 BORDER = "#2B2D30"
 BORDER_LIGHT = "#36383B"
 
-# Status colours only.
 GREEN = "#55B982"
 RED = "#D96565"
 YELLOW = "#C7A65B"
@@ -93,25 +92,36 @@ def resource_path(relative_path):
         "_MEIPASS",
         os.path.dirname(os.path.abspath(__file__))
     )
-    return os.path.join(base_path, relative_path)
+
+    return os.path.join(
+        base_path,
+        relative_path
+    )
 
 
 def load_config():
+
     if os.path.exists(CONFIG_PATH):
+
         try:
+
             with open(
                 CONFIG_PATH,
                 "r",
                 encoding="utf-8"
             ) as f:
+
                 return json.load(f)
+
         except Exception:
+
             return {}
 
     return {}
 
 
 def save_config(cfg):
+
     os.makedirs(
         CONFIG_DIR,
         exist_ok=True
@@ -122,6 +132,7 @@ def save_config(cfg):
         "w",
         encoding="utf-8"
     ) as f:
+
         json.dump(
             cfg,
             f,
@@ -130,36 +141,49 @@ def save_config(cfg):
 
 
 def load_license_keys():
+
     try:
+
         with open(
             resource_path("license_keys.json"),
             "r",
             encoding="utf-8"
         ) as f:
+
             return json.load(f)
+
     except Exception:
+
         return {}
 
 
 def load_changelog():
+
     try:
+
         with open(
             resource_path("CHANGELOG.md"),
             "r",
             encoding="utf-8"
         ) as f:
+
             return f.read()
+
     except Exception:
+
         return "Changelog not available."
 
 
 def validate_license(key):
+
     key = key.strip().upper()
 
     keys = load_license_keys()
 
     for tier, key_list in keys.items():
+
         if key in key_list:
+
             return tier
 
     return None
@@ -169,19 +193,30 @@ def compute_expiry(
     tier,
     activated_at
 ):
-    duration = TIER_DURATIONS.get(tier)
+
+    duration = TIER_DURATIONS.get(
+        tier
+    )
 
     if duration is None:
+
         return None
 
     return activated_at + duration
 
 
 def license_is_expired(cfg):
-    tier = cfg.get("license_tier")
-    activated_at = cfg.get("activated_at")
+
+    tier = cfg.get(
+        "license_tier"
+    )
+
+    activated_at = cfg.get(
+        "activated_at"
+    )
 
     if not tier or not activated_at:
+
         return True
 
     expiry = compute_expiry(
@@ -190,6 +225,7 @@ def license_is_expired(cfg):
     )
 
     if expiry is None:
+
         return False
 
     return time.time() >= expiry
@@ -199,26 +235,33 @@ def format_expiry(
     tier,
     activated_at
 ):
+
     expiry = compute_expiry(
         tier,
         activated_at
     )
 
     if expiry is None:
+
         return "No expiry"
 
     remaining = expiry - time.time()
 
     if remaining <= 0:
+
         return "Expired"
 
     if tier == "TRIAL":
+
         mins, secs = divmod(
             int(remaining),
             60
         )
 
-        return f"Expires in {mins:02d}:{secs:02d}"
+        return (
+            f"Expires in "
+            f"{mins:02d}:{secs:02d}"
+        )
 
     return time.strftime(
         "Expires %d %b %Y",
@@ -231,6 +274,7 @@ def format_expiry(
 # ============================================================
 
 def vt_headers(api_key):
+
     return {
         "x-apikey": api_key,
         "Accept": "application/json",
@@ -243,6 +287,7 @@ def vt_request(
     method="GET",
     data=None
 ):
+
     req = urlrequest.Request(
         url,
         method=method,
@@ -254,8 +299,11 @@ def vt_request(
         req,
         timeout=30
     ) as resp:
+
         return json.loads(
-            resp.read().decode("utf-8")
+            resp.read().decode(
+                "utf-8"
+            )
         )
 
 
@@ -263,6 +311,7 @@ def sha256_of_file(
     path,
     chunk_size=1 << 20
 ):
+
     h = hashlib.sha256()
 
     with open(
@@ -288,6 +337,7 @@ def vt_lookup_file_hash(
     file_hash,
     api_key
 ):
+
     return vt_request(
         f"{VT_BASE}/files/{file_hash}",
         api_key
@@ -298,14 +348,18 @@ def vt_upload_file(
     path,
     api_key
 ):
+
     boundary = "----ZXAVBoundary"
 
-    filename = os.path.basename(path)
+    filename = os.path.basename(
+        path
+    )
 
     with open(
         path,
         "rb"
     ) as f:
+
         file_bytes = f.read()
 
     body = bytearray()
@@ -347,7 +401,9 @@ def vt_upload_file(
     ) as resp:
 
         data = json.loads(
-            resp.read().decode("utf-8")
+            resp.read().decode(
+                "utf-8"
+            )
         )
 
     return data["data"]["id"]
@@ -357,6 +413,7 @@ def vt_get_analysis(
     analysis_id,
     api_key
 ):
+
     return vt_request(
         f"{VT_BASE}/analyses/{analysis_id}",
         api_key
@@ -367,6 +424,7 @@ def vt_submit_url(
     target_url,
     api_key
 ):
+
     body = urlencode({
         "url": target_url
     }).encode()
@@ -388,7 +446,9 @@ def vt_submit_url(
     ) as resp:
 
         data = json.loads(
-            resp.read().decode("utf-8")
+            resp.read().decode(
+                "utf-8"
+            )
         )
 
     return data["data"]["id"]
@@ -401,6 +461,7 @@ def vt_submit_url(
 class ZXAVApp(tk.Tk):
 
     def __init__(self):
+
         super().__init__()
 
         self.title(
@@ -428,7 +489,8 @@ class ZXAVApp(tk.Tk):
 
         self._configure_ttk()
 
-        self._route_startup()
+        # Start with the splash screen.
+        self._show_startup_screen()
 
     # ========================================================
     # ttk styling
@@ -439,8 +501,13 @@ class ZXAVApp(tk.Tk):
         style = ttk.Style(self)
 
         try:
-            style.theme_use("clam")
+
+            style.theme_use(
+                "clam"
+            )
+
         except Exception:
+
             pass
 
         style.configure(
@@ -496,6 +563,7 @@ class ZXAVApp(tk.Tk):
     def clear_window(self):
 
         for widget in self.winfo_children():
+
             widget.destroy()
 
     def make_button(
@@ -576,6 +644,177 @@ class ZXAVApp(tk.Tk):
         )
 
         return frame, inner
+
+    # ========================================================
+    # Startup splash screen
+    # ========================================================
+
+    def _show_startup_screen(self):
+
+        self.clear_window()
+
+        splash = tk.Frame(
+            self,
+            bg=BG
+        )
+
+        splash.pack(
+            fill="both",
+            expand=True
+        )
+
+        # ----------------------------------------------------
+        # First splash
+        # ----------------------------------------------------
+
+        first_screen = tk.Frame(
+            splash,
+            bg=BG
+        )
+
+        first_screen.pack(
+            fill="both",
+            expand=True
+        )
+
+        tk.Label(
+            first_screen,
+            text="иди на хуй",
+            bg=BG,
+            fg=WHITE,
+            font=(
+                "Segoe UI",
+                32,
+                "bold"
+            )
+        ).place(
+            relx=0.5,
+            rely=0.44,
+            anchor="center"
+        )
+
+        tk.Label(
+            first_screen,
+            text="Loading ZX.AV...",
+            bg=BG,
+            fg=MUTED,
+            font=(
+                "Segoe UI",
+                9
+            )
+        ).place(
+            relx=0.5,
+            rely=0.54,
+            anchor="center"
+        )
+
+        progress = ttk.Progressbar(
+            first_screen,
+            style="ZX.Horizontal.TProgressbar",
+            mode="indeterminate",
+            length=260
+        )
+
+        progress.place(
+            relx=0.5,
+            rely=0.61,
+            anchor="center"
+        )
+
+        progress.start(12)
+
+        # After 5 seconds, show the second splash.
+        self.after(
+            5000,
+            lambda: self._show_second_splash(
+                splash,
+                progress
+            )
+        )
+
+    def _show_second_splash(
+        self,
+        splash,
+        old_progress
+    ):
+
+        old_progress.stop()
+
+        self.clear_window()
+
+        second_screen = tk.Frame(
+            self,
+            bg=BG
+        )
+
+        second_screen.pack(
+            fill="both",
+            expand=True
+        )
+
+        tk.Label(
+            second_screen,
+            text="SECURED BY ZX.AI",
+            bg=BG,
+            fg=WHITE,
+            font=(
+                "Segoe UI",
+                25,
+                "bold"
+            )
+        ).place(
+            relx=0.5,
+            rely=0.45,
+            anchor="center"
+        )
+
+        tk.Label(
+            second_screen,
+            text="dolbayob",
+            bg=BG,
+            fg=MUTED,
+            font=(
+                "Segoe UI",
+                12,
+                "bold"
+            )
+        ).place(
+            relx=0.5,
+            rely=0.54,
+            anchor="center"
+        )
+
+        progress = ttk.Progressbar(
+            second_screen,
+            style="ZX.Horizontal.TProgressbar",
+            mode="indeterminate",
+            length=260
+        )
+
+        progress.place(
+            relx=0.5,
+            rely=0.61,
+            anchor="center"
+        )
+
+        progress.start(12)
+
+        # After another 5 seconds, continue normally.
+        self.after(
+            5000,
+            lambda: self._finish_startup(
+                progress
+            )
+        )
+
+    def _finish_startup(
+        self,
+        progress
+    ):
+
+        progress.stop()
+
+        self._route_startup()
 
     # ========================================================
     # Startup routing
@@ -668,7 +907,11 @@ class ZXAVApp(tk.Tk):
             text="ZX.AV",
             bg=BG,
             fg=WHITE,
-            font=("Segoe UI", 25, "bold")
+            font=(
+                "Segoe UI",
+                25,
+                "bold"
+            )
         ).pack(
             anchor="w"
         )
@@ -678,7 +921,11 @@ class ZXAVApp(tk.Tk):
             text=APP_TAGLINE,
             bg=BG,
             fg=MUTED,
-            font=("Segoe UI", 8, "bold")
+            font=(
+                "Segoe UI",
+                8,
+                "bold"
+            )
         ).pack(
             anchor="w",
             pady=(4, 0)
@@ -703,7 +950,11 @@ class ZXAVApp(tk.Tk):
             text="License activation",
             bg=PANEL,
             fg=WHITE,
-            font=("Segoe UI", 19, "bold")
+            font=(
+                "Segoe UI",
+                19,
+                "bold"
+            )
         ).pack(
             anchor="w",
             padx=35
@@ -717,7 +968,10 @@ class ZXAVApp(tk.Tk):
             ),
             bg=PANEL,
             fg=MUTED,
-            font=("Segoe UI", 9),
+            font=(
+                "Segoe UI",
+                9
+            ),
             wraplength=520,
             justify="left"
         ).pack(
@@ -733,7 +987,10 @@ class ZXAVApp(tk.Tk):
                 text=expired_message,
                 bg=PANEL,
                 fg=RED,
-                font=("Segoe UI", 9)
+                font=(
+                    "Segoe UI",
+                    9
+                )
             ).pack(
                 anchor="w",
                 padx=35,
@@ -745,7 +1002,11 @@ class ZXAVApp(tk.Tk):
             text="LICENSE KEY",
             bg=PANEL,
             fg=MUTED,
-            font=("Segoe UI", 8, "bold")
+            font=(
+                "Segoe UI",
+                8,
+                "bold"
+            )
         ).pack(
             anchor="w",
             padx=35,
@@ -762,7 +1023,10 @@ class ZXAVApp(tk.Tk):
             insertbackground=WHITE,
             relief="flat",
             bd=0,
-            font=("Consolas", 11)
+            font=(
+                "Consolas",
+                11
+            )
         )
 
         entry.pack(
@@ -776,7 +1040,10 @@ class ZXAVApp(tk.Tk):
             text="",
             bg=PANEL,
             fg=MUTED,
-            font=("Segoe UI", 9)
+            font=(
+                "Segoe UI",
+                9
+            )
         )
 
         status.pack(
@@ -902,7 +1169,11 @@ class ZXAVApp(tk.Tk):
             text="ZX.AV",
             bg=BG,
             fg=WHITE,
-            font=("Segoe UI", 25, "bold")
+            font=(
+                "Segoe UI",
+                25,
+                "bold"
+            )
         ).pack(
             anchor="w"
         )
@@ -912,7 +1183,11 @@ class ZXAVApp(tk.Tk):
             text=APP_TAGLINE,
             bg=BG,
             fg=MUTED,
-            font=("Segoe UI", 8, "bold")
+            font=(
+                "Segoe UI",
+                8,
+                "bold"
+            )
         ).pack(
             anchor="w",
             pady=(4, 0)
@@ -937,7 +1212,11 @@ class ZXAVApp(tk.Tk):
             text="VirusTotal connection",
             bg=PANEL,
             fg=WHITE,
-            font=("Segoe UI", 19, "bold")
+            font=(
+                "Segoe UI",
+                19,
+                "bold"
+            )
         ).pack(
             anchor="w",
             padx=35
@@ -951,7 +1230,10 @@ class ZXAVApp(tk.Tk):
             ),
             bg=PANEL,
             fg=MUTED,
-            font=("Segoe UI", 9),
+            font=(
+                "Segoe UI",
+                9
+            ),
             wraplength=520,
             justify="left"
         ).pack(
@@ -965,7 +1247,11 @@ class ZXAVApp(tk.Tk):
             text="API KEY",
             bg=PANEL,
             fg=MUTED,
-            font=("Segoe UI", 8, "bold")
+            font=(
+                "Segoe UI",
+                8,
+                "bold"
+            )
         ).pack(
             anchor="w",
             padx=35,
@@ -988,7 +1274,10 @@ class ZXAVApp(tk.Tk):
             insertbackground=WHITE,
             relief="flat",
             bd=0,
-            font=("Consolas", 10)
+            font=(
+                "Consolas",
+                10
+            )
         )
 
         entry.pack(
@@ -1002,7 +1291,10 @@ class ZXAVApp(tk.Tk):
             text="",
             bg=PANEL,
             fg=MUTED,
-            font=("Segoe UI", 9)
+            font=(
+                "Segoe UI",
+                9
+            )
         )
 
         status.pack(
@@ -1153,10 +1445,6 @@ class ZXAVApp(tk.Tk):
 
         self.clear_window()
 
-        # ----------------------------------------------------
-        # Sidebar
-        # ----------------------------------------------------
-
         sidebar = tk.Frame(
             self,
             bg=SIDEBAR,
@@ -1186,7 +1474,11 @@ class ZXAVApp(tk.Tk):
             text="ZX.AV",
             bg=SIDEBAR,
             fg=WHITE,
-            font=("Segoe UI", 22, "bold")
+            font=(
+                "Segoe UI",
+                22,
+                "bold"
+            )
         ).pack(
             anchor="w"
         )
@@ -1196,7 +1488,11 @@ class ZXAVApp(tk.Tk):
             text=APP_TAGLINE,
             bg=SIDEBAR,
             fg=MUTED,
-            font=("Segoe UI", 7, "bold")
+            font=(
+                "Segoe UI",
+                7,
+                "bold"
+            )
         ).pack(
             anchor="w",
             pady=(4, 0)
@@ -1207,7 +1503,11 @@ class ZXAVApp(tk.Tk):
             text="WORKSPACE",
             bg=SIDEBAR,
             fg=MUTED_DARK,
-            font=("Segoe UI", 7, "bold")
+            font=(
+                "Segoe UI",
+                7,
+                "bold"
+            )
         ).pack(
             anchor="w",
             padx=22,
@@ -1248,7 +1548,11 @@ class ZXAVApp(tk.Tk):
             text="APPLICATION",
             bg=SIDEBAR,
             fg=MUTED_DARK,
-            font=("Segoe UI", 7, "bold")
+            font=(
+                "Segoe UI",
+                7,
+                "bold"
+            )
         ).pack(
             anchor="w",
             padx=22,
@@ -1295,7 +1599,11 @@ class ZXAVApp(tk.Tk):
             text="LICENSE",
             bg=SIDEBAR,
             fg=MUTED_DARK,
-            font=("Segoe UI", 7, "bold")
+            font=(
+                "Segoe UI",
+                7,
+                "bold"
+            )
         ).pack(
             anchor="w"
         )
@@ -1308,7 +1616,11 @@ class ZXAVApp(tk.Tk):
             ),
             bg=SIDEBAR,
             fg=TEXT,
-            font=("Segoe UI", 9, "bold")
+            font=(
+                "Segoe UI",
+                9,
+                "bold"
+            )
         ).pack(
             anchor="w",
             pady=(3, 0)
@@ -1330,15 +1642,14 @@ class ZXAVApp(tk.Tk):
                 text=expiry_text,
                 bg=SIDEBAR,
                 fg=MUTED,
-                font=("Segoe UI", 7)
+                font=(
+                    "Segoe UI",
+                    7
+                )
             ).pack(
                 anchor="w",
                 pady=(2, 0)
             )
-
-        # ----------------------------------------------------
-        # Main content
-        # ----------------------------------------------------
 
         main = tk.Frame(
             self,
@@ -1351,11 +1662,6 @@ class ZXAVApp(tk.Tk):
             expand=True
         )
 
-        # ----------------------------------------------------
-        # Header
-        # ----------------------------------------------------
-
-        # Increased from 78px so the subtitle has room.
         header = tk.Frame(
             main,
             bg=BG,
@@ -1384,18 +1690,24 @@ class ZXAVApp(tk.Tk):
             text="Overview",
             bg=BG,
             fg=WHITE,
-            font=("Segoe UI", 20, "bold")
+            font=(
+                "Segoe UI",
+                20,
+                "bold"
+            )
         ).pack(
             anchor="w"
         )
 
-        # Fixed subtitle spacing.
         tk.Label(
             title_area,
             text="File and URL security analysis",
             bg=BG,
             fg=MUTED,
-            font=("Segoe UI", 9)
+            font=(
+                "Segoe UI",
+                9
+            )
         ).pack(
             anchor="w",
             pady=(5, 0)
@@ -1422,7 +1734,10 @@ class ZXAVApp(tk.Tk):
             text="●",
             bg=BG,
             fg=GREEN if api_set else RED,
-            font=("Segoe UI", 9)
+            font=(
+                "Segoe UI",
+                9
+            )
         ).pack(
             side="left"
         )
@@ -1436,15 +1751,14 @@ class ZXAVApp(tk.Tk):
             ),
             bg=BG,
             fg=MUTED,
-            font=("Segoe UI", 9)
+            font=(
+                "Segoe UI",
+                9
+            )
         ).pack(
             side="left",
             padx=(5, 0)
         )
-
-        # ----------------------------------------------------
-        # Content
-        # ----------------------------------------------------
 
         content = tk.Frame(
             main,
@@ -1457,10 +1771,6 @@ class ZXAVApp(tk.Tk):
             padx=30,
             pady=(4, 25)
         )
-
-        # ----------------------------------------------------
-        # Scan area
-        # ----------------------------------------------------
 
         scan_panel, scan = self.make_panel(
             content,
@@ -1478,7 +1788,11 @@ class ZXAVApp(tk.Tk):
             text="SCAN",
             bg=PANEL,
             fg=MUTED,
-            font=("Segoe UI", 8, "bold")
+            font=(
+                "Segoe UI",
+                8,
+                "bold"
+            )
         ).pack(
             anchor="w"
         )
@@ -1488,7 +1802,11 @@ class ZXAVApp(tk.Tk):
             text="Analyze a file or URL",
             bg=PANEL,
             fg=WHITE,
-            font=("Segoe UI", 15, "bold")
+            font=(
+                "Segoe UI",
+                15,
+                "bold"
+            )
         ).pack(
             anchor="w",
             pady=(2, 4)
@@ -1502,7 +1820,10 @@ class ZXAVApp(tk.Tk):
             ),
             bg=PANEL,
             fg=MUTED,
-            font=("Segoe UI", 9)
+            font=(
+                "Segoe UI",
+                9
+            )
         ).pack(
             anchor="w"
         )
@@ -1546,10 +1867,6 @@ class ZXAVApp(tk.Tk):
             side="right",
             pady=4
         )
-
-        # ----------------------------------------------------
-        # Stats
-        # ----------------------------------------------------
 
         stats = tk.Frame(
             content,
@@ -1603,7 +1920,11 @@ class ZXAVApp(tk.Tk):
                 text=title,
                 bg=PANEL,
                 fg=MUTED,
-                font=("Segoe UI", 7, "bold")
+                font=(
+                    "Segoe UI",
+                    7,
+                    "bold"
+                )
             ).pack(
                 anchor="w",
                 padx=15,
@@ -1615,7 +1936,11 @@ class ZXAVApp(tk.Tk):
                 text=value,
                 bg=PANEL,
                 fg=WHITE,
-                font=("Segoe UI", 17, "bold")
+                font=(
+                    "Segoe UI",
+                    17,
+                    "bold"
+                )
             )
 
             val.pack(
@@ -1628,10 +1953,6 @@ class ZXAVApp(tk.Tk):
                 key
             ] = val
 
-        # ----------------------------------------------------
-        # Lower panels
-        # ----------------------------------------------------
-
         lower = tk.Frame(
             content,
             bg=BG
@@ -1641,10 +1962,6 @@ class ZXAVApp(tk.Tk):
             fill="both",
             expand=True
         )
-
-        # ----------------------------------------------------
-        # Protection panel
-        # ----------------------------------------------------
 
         protection_panel = tk.Frame(
             lower,
@@ -1669,7 +1986,11 @@ class ZXAVApp(tk.Tk):
             text="PROTECTION",
             bg=PANEL,
             fg=MUTED,
-            font=("Segoe UI", 8, "bold")
+            font=(
+                "Segoe UI",
+                8,
+                "bold"
+            )
         ).pack(
             anchor="w",
             padx=18,
@@ -1693,14 +2014,13 @@ class ZXAVApp(tk.Tk):
             text="No scans yet",
             bg=PANEL,
             fg=MUTED,
-            font=("Segoe UI", 9)
+            font=(
+                "Segoe UI",
+                9
+            )
         )
 
         self.protection_status.pack()
-
-        # ----------------------------------------------------
-        # History
-        # ----------------------------------------------------
 
         history_panel = tk.Frame(
             lower,
@@ -1731,7 +2051,11 @@ class ZXAVApp(tk.Tk):
             text="RECENT SCANS",
             bg=PANEL,
             fg=MUTED,
-            font=("Segoe UI", 8, "bold")
+            font=(
+                "Segoe UI",
+                8,
+                "bold"
+            )
         ).pack(
             side="left"
         )
@@ -1791,10 +2115,6 @@ class ZXAVApp(tk.Tk):
             pady=(0, 10)
         )
 
-        # ----------------------------------------------------
-        # Status bar
-        # ----------------------------------------------------
-
         self.status_var = tk.StringVar(
             value="Ready."
         )
@@ -1819,7 +2139,10 @@ class ZXAVApp(tk.Tk):
             textvariable=self.status_var,
             bg=SIDEBAR,
             fg=MUTED,
-            font=("Segoe UI", 8)
+            font=(
+                "Segoe UI",
+                8
+            )
         ).pack(
             anchor="w",
             padx=15,
@@ -1867,7 +2190,10 @@ class ZXAVApp(tk.Tk):
             bd=0,
             highlightthickness=0,
             cursor="hand2",
-            font=("Segoe UI", 9),
+            font=(
+                "Segoe UI",
+                9
+            ),
             padx=22,
             pady=9
         )
@@ -2007,7 +2333,11 @@ class ZXAVApp(tk.Tk):
             cy - 5,
             text=percent,
             fill=WHITE,
-            font=("Segoe UI", 18, "bold")
+            font=(
+                "Segoe UI",
+                18,
+                "bold"
+            )
         )
 
         c.create_text(
@@ -2015,7 +2345,10 @@ class ZXAVApp(tk.Tk):
             cy + 18,
             text="clean",
             fill=MUTED,
-            font=("Segoe UI", 8)
+            font=(
+                "Segoe UI",
+                8
+            )
         )
 
         if total == 0:
@@ -2048,10 +2381,13 @@ class ZXAVApp(tk.Tk):
         if self.watchdog_job:
 
             try:
+
                 self.after_cancel(
                     self.watchdog_job
                 )
+
             except Exception:
+
                 pass
 
             self.watchdog_job = None
@@ -2059,6 +2395,7 @@ class ZXAVApp(tk.Tk):
         def tick():
 
             if not self.winfo_exists():
+
                 return
 
             if license_is_expired(
@@ -2114,7 +2451,11 @@ class ZXAVApp(tk.Tk):
             text="Settings",
             bg=BG,
             fg=WHITE,
-            font=("Segoe UI", 19, "bold")
+            font=(
+                "Segoe UI",
+                19,
+                "bold"
+            )
         ).pack(
             anchor="w",
             padx=30,
@@ -2126,7 +2467,10 @@ class ZXAVApp(tk.Tk):
             text="VirusTotal connection",
             bg=BG,
             fg=MUTED,
-            font=("Segoe UI", 9)
+            font=(
+                "Segoe UI",
+                9
+            )
         ).pack(
             anchor="w",
             padx=30
@@ -2150,7 +2494,11 @@ class ZXAVApp(tk.Tk):
             text="API KEY",
             bg=PANEL,
             fg=MUTED,
-            font=("Segoe UI", 8, "bold")
+            font=(
+                "Segoe UI",
+                8,
+                "bold"
+            )
         ).pack(
             anchor="w",
             padx=20,
@@ -2173,7 +2521,10 @@ class ZXAVApp(tk.Tk):
             insertbackground=WHITE,
             relief="flat",
             bd=0,
-            font=("Consolas", 10)
+            font=(
+                "Consolas",
+                10
+            )
         )
 
         entry.pack(
@@ -2187,7 +2538,10 @@ class ZXAVApp(tk.Tk):
             text="",
             bg=PANEL,
             fg=MUTED,
-            font=("Segoe UI", 9)
+            font=(
+                "Segoe UI",
+                9
+            )
         )
 
         status.pack(
@@ -2327,6 +2681,7 @@ class ZXAVApp(tk.Tk):
         api_key = self._require_api_key()
 
         if not api_key:
+
             return
 
         path = filedialog.askopenfilename(
@@ -2334,6 +2689,7 @@ class ZXAVApp(tk.Tk):
         )
 
         if not path:
+
             return
 
         self._run_async(
@@ -2384,6 +2740,7 @@ class ZXAVApp(tk.Tk):
             except urlerror.HTTPError as e:
 
                 if e.code != 404:
+
                     raise
 
                 self._set_status(
@@ -2448,6 +2805,7 @@ class ZXAVApp(tk.Tk):
         api_key = self._require_api_key()
 
         if not api_key:
+
             return
 
         target = simpledialog.askstring(
@@ -2457,6 +2815,7 @@ class ZXAVApp(tk.Tk):
         )
 
         if not target:
+
             return
 
         self._run_async(
@@ -2649,6 +3008,7 @@ class ZXAVApp(tk.Tk):
         def worker():
 
             try:
+
                 fn(*args)
 
             finally:
@@ -2737,7 +3097,10 @@ class ZXAVApp(tk.Tk):
             fg=TEXT,
             insertbackground=WHITE,
             selectbackground=PANEL_HOVER,
-            font=("Consolas", 9),
+            font=(
+                "Consolas",
+                9
+            ),
             wrap="word",
             borderwidth=0,
             highlightthickness=0,
@@ -2771,3 +3134,6 @@ if __name__ == "__main__":
     app = ZXAVApp()
 
     app.mainloop()
+```
+
+The only startup timing change is the two-stage splash: **5 seconds + 5 seconds = 10 seconds total** before the normal application screen appears.
