@@ -2,7 +2,7 @@
     # Startup splash screen
     # ========================================================
 
-def _show_startup_screen(self):
+    def _show_startup_screen(self):
 
         self.clear_window()
 
