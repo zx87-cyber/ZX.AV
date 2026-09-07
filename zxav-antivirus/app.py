@@ -2,6 +2,32 @@
 # Startup splash screen
 # ========================================================
 
+def _get_safe_font(family, size, weight="normal"):
+    """Return a font tuple that works on both Linux and Windows."""
+    import tkinter.font as tkFont
+    
+    # List of fallback fonts for different platforms
+    fallbacks = ["Arial", "Liberation Sans", "DejaVu Sans", "Helvetica"]
+    
+    # Try the requested font first
+    try:
+        test_font = tkFont.Font(family=family, size=size, weight=weight)
+        return (family, size, weight)
+    except:
+        pass
+    
+    # Fall back to first available font
+    for fb in fallbacks:
+        try:
+            test_font = tkFont.Font(family=fb, size=size, weight=weight)
+            return (fb, size, weight)
+        except:
+            continue
+    
+    # Last resort - just return a basic tuple
+    return ("TkDefaultFont", size, weight)
+
+
 def _show_startup_screen(self):
 
     self.clear_window()
@@ -35,11 +61,7 @@ def _show_startup_screen(self):
         text="иди на хуй",
         bg=BG,
         fg=WHITE,
-        font=(
-            "Segoe UI",
-            32,
-            "bold"
-        )
+        font=_get_safe_font("Segoe UI", 32, "bold")
     ).place(
         relx=0.5,
         rely=0.44,
@@ -51,10 +73,7 @@ def _show_startup_screen(self):
         text="Loading ZX.AV...",
         bg=BG,
         fg=MUTED,
-        font=(
-            "Segoe UI",
-            9
-        )
+        font=_get_safe_font("Segoe UI", 9)
     ).place(
         relx=0.5,
         rely=0.54,
@@ -117,11 +136,7 @@ def _show_second_splash(
         text="SECURED BY ZX.AI",
         bg=BG,
         fg=WHITE,
-        font=(
-            "Segoe UI",
-            25,
-            "bold"
-        )
+        font=_get_safe_font("Segoe UI", 25, "bold")
     ).place(
         relx=0.5,
         rely=0.45,
@@ -133,11 +148,7 @@ def _show_second_splash(
         text="dolbayob",
         bg=BG,
         fg=MUTED,
-        font=(
-            "Segoe UI",
-            12,
-            "bold"
-        )
+        font=_get_safe_font("Segoe UI", 12, "bold")
     ).place(
         relx=0.5,
         rely=0.54,
