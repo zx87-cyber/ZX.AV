@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pyinstaller
-      - run: pyinstaller --onefile --windowed --name ZX.AV --add-data "license_keys.json;." main.py
+      - run: pyinstaller --onefile --windowed --name ZX.AV --add-data "zxav_tk/license_keys.json;." zxav_tk/main.py
       - uses: actions/upload-artifact@v4
         with:
           name: ZX.AV-windows
