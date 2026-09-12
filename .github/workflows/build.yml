@@ -1,4 +1,4 @@
-name: Build Windows exe
+name: Build ZX.AV
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,3 +19,66 @@ jobs:
         with:
           name: ZX.AV-windows
           path: dist/ZX.AV.exe
+
+  build-linux-appimage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tkinter (needed to bundle it into the binary)
+        run: sudo apt-get update && sudo apt-get install -y python3-tk
+
+      - run: pip install pyinstaller
+
+      - name: Build the Linux binary with PyInstaller
+        run: pyinstaller --onefile --windowed --name ZX.AV --add-data "zxav_tk/license_keys.json:." zxav_tk/main.py
+
+      - name: Assemble the AppDir
+        run: |
+          mkdir -p AppDir/usr/bin
+          cp dist/ZX.AV AppDir/usr/bin/
+
+          cat > AppDir/ZX.AV.desktop << 'EOF'
+          [Desktop Entry]
+          Name=ZX.AV
+          Exec=ZX.AV
+          Icon=zxav
+          Type=Application
+          Categories=Utility;
+          EOF
+
+          python3 -c "
+          import struct, zlib
+          def png(w, h, rgb):
+              def chunk(tag, data):
+                  return struct.pack('>I', len(data)) + tag + data + struct.pack('>I', zlib.crc32(tag + data))
+              sig = b'\x89PNG\r\n\x1a\n'
+              ihdr = chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0))
+              row = b'\x00' + bytes(rgb) * w
+              idat = chunk(b'IDAT', zlib.compress(row * h))
+              return sig + ihdr + idat + chunk(b'IEND', b'')
+          open('AppDir/zxav.png', 'wb').write(png(64, 64, (85, 185, 130)))
+          "
+
+          cat > AppDir/AppRun << 'EOF'
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          exec "${HERE}/usr/bin/ZX.AV" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+
+      - name: Download appimagetool
+        run: |
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+
+      - name: Build the AppImage
+        run: ./appimagetool --appimage-extract-and-run AppDir ZX.AV-x86_64.AppImage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZX.AV-linux-appimage
+          path: ZX.AV-x86_64.AppImage
